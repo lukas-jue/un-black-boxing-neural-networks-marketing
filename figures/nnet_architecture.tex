@@ -1,0 +1,79 @@
+\begin{figure}
+\begin{center}
+\def\layersep{3.5cm}
+
+\begin{tikzpicture}[
+   shorten >=1pt,->,
+   draw=black!50,
+    node distance=\layersep,
+    every pin edge/.style={<-,shorten <=1pt},
+    neuron/.style={circle,fill=black!25,minimum size=17pt,inner sep=0pt},
+    input neuron/.style={neuron, fill=green!50},
+    output neuron/.style={neuron, fill=red!50},
+    hidden neuron/.style={neuron, fill=blue!50},
+    annot/.style={text width=4em, text centered}
+]
+
+    % Draw the input layer nodes
+    \foreach \name  [count=\y] in 
+    {acad\_X1, age\_bin1, \dots,  age\_bin4, mobile\_logins, tenure, \dots, total\_mailings, transactions\_year}
+     {   \node[input neuron, pin=left:\name] (I-\y) at (0,-\y cm) {};  
+     }
+
+    % set number of hidden layers
+    \newcommand\Nhidden{2}
+    \newcommand\NodOne{5}
+    \newcommand\NodTwo{10}
+    \newcommand\Nod{9}
+
+    % Draw the hidden layer nodes
+%    \foreach \N in {1,...,\Nhidden} {
+
+     \foreach \y in {1,...,\NodOne} {
+          \path[yshift=-1.80cm]
+              node[hidden neuron] (H1-\y) at (1*\layersep,-\y cm) {};
+              }
+    \node[annot,above of=H1-1, node distance=2.8cm] (hl1) {Hidden layer 1};
+     \foreach \y in {1,...,\NodTwo} {
+          \path[yshift=0cm]
+              node[hidden neuron] (H2-\y) at (2*\layersep,-\y cm) {};            
+           }
+    \node[annot,above of=H2-1, node distance=1cm] (hl2) {Hidden layer 2};          
+
+%    }
+
+    \node[below=3.2cm of H1-\NodOne] (text1) {64 neurons};
+    \node at (text1 -| H2-1) (text2) {128 neurons};
+	\node at (text1 -| I-9) (text1) {74 inputs};
+
+    % Draw the output layer node
+    \node[output neuron,pin={[pin edge={->}]right:xsell}, right of=H\Nhidden-5] (O) {};
+
+    \node at (text1 -| O) (text3) {1 output};
+    % Connect every node in the input layer with every node in the
+    % hidden layer.
+    \foreach \source in {1,...,9}{
+        \foreach \dest in {1,...,\NodOne}{
+            \path (I-\source) edge (H1-\dest);
+         }
+    }
+    % connect all hidden stuff
+    \foreach [remember=\N as \lastN (initially 1)] \N in {2,...,\Nhidden}
+       \foreach \source in {1,...,\NodOne}
+           \foreach \dest in {1,...,\NodTwo}
+               \path (H\lastN-\source) edge (H\N-\dest);
+
+    % Connect every node in the hidden layer with the output layer
+    \foreach \source in {1,...,\NodTwo}
+        \path (H\Nhidden-\source) edge (O);
+
+    % Annotate the layers
+
+    \node[annot,left of=hl1] {Input layer};
+    \node[annot,right of=hl\Nhidden] {Output layer};
+\end{tikzpicture}
+% End of code
+\label{fig_nn_arch}
+\caption{Architecture of the Artificial Neural Network implemented in this study}
+\end{center}
+\end{figure}
