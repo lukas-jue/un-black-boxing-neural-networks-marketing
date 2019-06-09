@@ -126,12 +126,11 @@ uninterpretable black box---by introducing the Local Interpretable Model-agnosti
 
 \subsection{Feature Engineering and Data Set Preparation}
 In order to feed seamlessly into a neural network, extensive feature engineering and data preparation is required \citep{hastieElementsStatisticalLearning2017}.
-Before training the model, I (a) replace missing values in \code{pref\_device} and \code{occupation} by \code{None\_or\_missing},
-(b) transform all \code{char} variables to a \code{factor} type, and (c) remove the misleading feature \code{ID}.
+Before training the model, I replace missing values in \code{pref\_device} and \code{occupation} by \code{None\_or\_missing}, transform all \code{char} variables to a \code{factor} type, and remove the misleading feature \code{ID}.
 However, there are still numerous features including missing values. Since they are not missing at random, they need to be dealt with in order to not
 bias the prediction.
 Deleting all observations with missing values would do exactly that.
-Hence, I impute missing values with a Random Forest from the \code{randomForest::rfImpute()} function.
+Hence, I impute missing values with a Random Forest from the \pkg{randomForest}\code{::rfImpute()} function.
 This algorithm first replaces missing numeric (factor) variables with the median (mode) and then uses proximity measures from \code{randomForest}
 as weights to replace \code{NA's} with the weighted average (the value with the highest proximity) of the non-missing values and repeats this for a
 pre-defined number of iterations\footnote{After four iterations the out-of-bag error did not decrease visibly anymore, hence four iterations were chosen}
@@ -165,8 +164,8 @@ of those features.
 \end{figure}
 
 \subsection{Artificial Neural Network with Keras}
-\subsection{Hyperparameter Tuning}
-
+\subsection{Hyperparameter Tuning by Cross-validation}
+\citep{hansenNeuralNetworkEnsembles1990}
 
 \input{figures/nnet_architecture.tex}
 
@@ -179,7 +178,8 @@ of those features.
 
 \subsection{Local Interpretable Model-agnostic Explanation (LIME)}
 \section{Results and Model Comparison}
-\subsection{Comparing the Predicions of ANN with the Benchmark Logit Model}
+\subsection{Choosing the Neural Network Architecture}
+\subsection{Comparing the Predicions of the ANN with the Benchmark Logit Model}
 
 \begin{figure}[ht]
 	\centering
