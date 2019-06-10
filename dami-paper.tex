@@ -164,7 +164,33 @@ of those features.
 \end{figure}
 
 \subsection{Artificial Neural Network with Keras}
-\subsection{Hyperparameter Tuning by Cross-validation}
+
+While the previous section discussed the steps required to transform the data to a suitable format for an ANN,
+this section will describe the basic architecture of this classification method.
+This study uses the \proglang{R} interface \pkg{keras} \citep{cholletInterfaceKeras2017} to the popular same name \proglang{Python} library.
+This high-level API enables an easier way to access the features of Google's \pkg{TensorFlow} \citep{abadiTensorFlowLargeScaleMachine2015}.\\
+The neural network in this study is a common feedforward network which uses the backpropagation algorithm to adjust its weights \citep{werbosBackpropagationTimeWhat1990}.
+Based on the feature engineering process described in the previous chapter, the ANN has $n_x = 74$ inputs $X_i$, 
+two hidden layers with neurons $H_i^l$ referring to the $i^{th}$ neuron in the $l^{th}$ hidden layer. 
+The number of neurons in the hidden layers is subject to hyperparameter tuning in the following section.
+As a final layer, the ANN predicts the single output $\hat{Y}_i$, in our case \code{xsell}.
+This network uses a random uniform distribution to initialize the weights for each neuron $H_i^l$.
+Also, a bias initialized at zero feeds into the two hidden layers, for which each $H_i^l$ is activated by a rectifier function (\code{ReLU}).
+\cite{glorotDeepSparseRectifier2011} show that rectifying units in an ANN yield superior outcomes compared to others such as the hyperbolic tangent activation function. Since the output $\hat{Y}_i$ is a binary feature in this case, I use a sigmoid activation function for the output layer.
+To avoid overfitting, the model implements dropout for the hidden layers.
+This process randomly drops units from the ANN and thus leads to a more generalizable model \citep{srivastavaDropoutSimpleWay2014}.
+Mitigating the risk of overfitting to the training data is also one key objective of the next section.
+
+\subsection{Cross-validation and Hyperparameter Tuning}
+After setting up the basic architecture of the neural net, this section describes the process that leads to the \textit{best} model\footnote{as mentioned earlier, this is not the best model \textit{existing}, but \textit{found}.}.
+An important feature of the \textit{best} model is that it does not memorize the relationships in the training data set---overfitting---
+but rather learns the generalizable underlying mechanisms an thereby performs well on the holdout validation data set. 
+For this purpose I first describe the optimization of the ANN through cross-validation of the predictions of several training epochs on a holdout 
+sample and then introduce hyperparameter tuning---a process that leads to the most desirable configuration of the ANN by
+running many combinations of model specifications. \\
+For compiling the ANN, I use the adaptive moment estimation algorithm \code{Adam} \citep{kingmaAdamMethodStochastic2014}
+which is recommended as the go-to gradient descent optimizer \citep{ruderOverviewGradientDescent2016}.
+
 \citep{hansenNeuralNetworkEnsembles1990}
 
 \input{figures/nnet_architecture.tex}
