@@ -174,7 +174,9 @@ Based on the feature engineering process described in the previous chapter, the 
 two hidden layers with neurons $H_i^l$ referring to the $i^{th}$ neuron in the $l^{th}$ hidden layer. 
 The number of neurons in the hidden layers is subject to hyperparameter tuning in the following section.
 As a final layer, the ANN predicts the single output $\hat{Y}_i$, in our case \code{xsell}.
-This network uses a random uniform distribution to initialize the weights for each neuron $H_i^l$.
+Figure \ref{fig_nn_arch} graphically visualizes the architecture.
+\input{figures/nnet_architecture.tex} \label{fig_nn_arch}
+This network uses a random uniform distribution $U(-0.05, 0.05)$ to initialize the weights for each neuron $H_i^l$.
 Also, a bias initialized at zero feeds into the two hidden layers, for which each $H_i^l$ is activated by a rectifier function (\code{ReLU}).
 \cite{glorotDeepSparseRectifier2011} show that rectifying units in an ANN yield superior outcomes compared to others such as the hyperbolic tangent activation function. Since the output $\hat{Y}_i$ is a binary feature in this case, I use a sigmoid activation function for the output layer.
 To avoid overfitting, the model implements dropout for the hidden layers.
@@ -183,26 +185,56 @@ Mitigating the risk of overfitting to the training data is also one key objectiv
 
 \subsection{Cross-validation and Hyperparameter Tuning}
 After setting up the basic architecture of the neural net, this section describes the process that leads to the \textit{best} model\footnote{as mentioned earlier, this is not the best model \textit{existing}, but \textit{found}.}.
-An important feature of the \textit{best} model is that it does not memorize the relationships in the training data set---overfitting---
-but rather learns the generalizable underlying mechanisms an thereby performs well on the holdout validation data set. 
-For this purpose I first describe the optimization of the ANN through cross-validation of the predictions of several training epochs on a holdout 
+An important feature of the \textit{best} model is that it does not memorize the exact relationships in the training data set---overfitting---but
+rather learns the generalizable underlying mechanisms an thereby performs well on the holdout validation data set. 
+For this purpose I first describe the optimization of the ANN through cross-validating predictions of several training epochs on a holdout 
 sample and then introduce hyperparameter tuning---a process that leads to the most desirable configuration of the ANN by
 running many combinations of model specifications. \\
-For compiling the ANN, I use the adaptive moment estimation algorithm \code{Adam} \citep{kingmaAdamMethodStochastic2014}
+To compile the ANN, I use the adaptive moment estimation algorithm \code{Adam} \citep{kingmaAdamMethodStochastic2014}
 which is recommended as the go-to gradient descent optimizer \citep{ruderOverviewGradientDescent2016}.
-
-\citep{hansenNeuralNetworkEnsembles1990}
-
-\input{figures/nnet_architecture.tex}
-
+This optimizer minimizes the cross-entropy loss \citep{zhangGeneralizedCrossEntropy2018} for each training epoch and accordingly updates the weights
+for the next model.
+Figure \ref{fig_history} shows the training history of the chosen ANN over ten epochs and the cross-entropy loss in the top pane, and the accuracy
+in the bottom part, each for the training and validation data set. \\
 \begin{figure}[ht]
 	\centering
   \includegraphics[scale=0.8]{figures/train_history.pdf}
 	\caption{Loss and accuracy for training and test data over training history of the tuned model}
 	\label{fig_history}
 \end{figure}
+The validation accuracy in comparison with the training accuracy in this case indicates first how accurate the ANN predicts true positives 
+and true negatives in both data sets, but more importantly, gives an indication whether overfitting is an issue.
+If the training accuracy kept steadily increasing, while the validation accuracy kept relatively constant, the model would overfit---which means
+that the model is not generalizable beyond the training data set \citep{hansenNeuralNetworkEnsembles1990}.
+As exhibited in figure \ref{fig_history}, both accuracies are relatively constant and equal during the last training epochs.
+This is a strong indication that the model does not overfit and will perform similarly on the test or out-of-time data. \\
+However, one question remains unanswered with cross-validation: Which model architecture leads to the most accurate predictions?
+Hyperparameter tuning provides a remedy to this issue \citep{bergstraRandomSearchHyperparameter2012}.
+In short, this process runs numerous models with combinations of hyperparameters\footnote{Hyperparameters refer to the specifications of an ANN,
+such as number of units per hidden layer, dropout rate and weights, but also different optimization algorithms and activation functions \citep{bengioGradientbasedOptimizationHyperparameters2000}}.
+This study uses the "naive" grid method, which runs all possible combinations of pre-defined values for hyperparameters\footnote{I use each three different values of the hyperparameters \code{val\_acc}, \code{acc}, \code{units1}, \code{dropout1}, \code{units2}, \code{dropout2}, \code{epochs} and \code{batch}}.
+The model with the highest \code{val\_acc} is then chosen to be the \textit{best} model for prediction for this data set.
+However, this method is computationally expensive.
+It requires $N=a^b$ different models, where $a$ is the number of discrete values for each parameter and $b$ is the 
+number of hyperparameters to be tuned.
+Running two separate sets of hyperparameter combinations for 324 different models took roughly five hours on a standard consumer laptop.
+It can be assumed that this limited set of combinations did by far not yield the best model.
+However, this naive grid method needs an exponentially increasing number of different models and thus gets difficult to handle quite quickly.
+Possible solutions to this problem is random search, which is even more efficient than grid search \citep{bergstraRandomSearchHyperparameter2012}.
+
 
 \subsection{Local Interpretable Model-agnostic Explanation (LIME)}
+In contrast to traditional regression-based methods that yield beta-coefficients and enable the construction of a functional form of 
+the underlying mechanisms in the data, a neural network does not provide an easily interpretable function that links $Y$ to $X_i$.
+A common criticism of ANN hence is the "black-box"-argument \citep{benitezAreArtificialNeural1997, dayhoffArtificialNeuralNetworks2001}.
+Though the model might yield more accurate predictions, there is no clear answer to the question why the model predicted those particular values
+or which features contributed by how much to that. \\
+With the development of new methods that address this problem, an ANN is less a black box.
+Consistent with the research question to uncover factors that drive cross-sell, 
+this section focuses on the Local Interpretable Model-agnostic Explanation (LIME) introduced by \cite{ribeiroWhyShouldTrust2016a} as a methodology
+to assess factor importance on a single customer level\footnote{Other tools such as neural interpretation diagrams, Garson's algorithm, sensitivity analysis or randomized approaches
+\citep{oldenIlluminatingBlackBox2002} offer similar explanations on an aggregate level. However, covering those is beyond the scope of this paper.}.
+
 \section{Results and Model Comparison}
 \subsection{Choosing the Neural Network Architecture}
 \subsection{Comparing the Predicions of the ANN with the Benchmark Logit Model}
