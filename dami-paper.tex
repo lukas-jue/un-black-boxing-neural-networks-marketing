@@ -94,6 +94,7 @@
 \pagestyle{plain}
 \pagenumbering{Roman}
 \tableofcontents
+\pagebreak
 \listoffigures
 \listoftables
 \newpage
@@ -152,13 +153,6 @@ The feature engineered data set consists of $N=72$ input variables that will be 
 	\label{fig_hist}
 \end{figure}Figure \ref{fig_hist} displays the histograms for each
 of those features.
-
-\begin{figure}[ht]
-	\centering
-  \includegraphics[scale=0.8]{figures/corrplot.pdf}
-	\caption{Correlation of feature engineered variables with xsell}
-	\label{fig_corr}
-\end{figure}
 
 \subsection{Artificial Neural Network with Keras}
 
@@ -222,6 +216,7 @@ Running two separate sets of hyperparameter combinations for 324 different model
 It can be assumed that this limited set of combinations did by far not yield the best model.
 However, this naive grid method needs an exponentially increasing number of different models and thus gets difficult to handle quite quickly.
 A possible solution to this problem is random search, which is even more efficient than grid search \citep{bergstraRandomSearchHyperparameter2012}.
+
 By cross-validating the predictions with a loss function and by tuning the ANN's hyperparameter, 
 this section described the approach to finding the most suitable model for the prediction task at hand.
 The next part turns to prediction explanation---a key discussion point and critique of neural networks
@@ -261,11 +256,6 @@ It concludes by reporting the feature importance for individual customers derive
 The task of choosing the \textit{best} ANN architecture is not trivial. 
 Using the approach described in section \ref{sec_crossval}, I ran a total of 324 different models, each with different combinations of hyperparameters.
 Ranked by $val\_acc$, table \ref{tab_hypertune} shows the top five and bottom two models by validation accuracy with respective model specifications.
-It is noteworthy that this evaluation metric only varies by five percentage points from the best ($65.6\%$) to the worst model ($60.2\%$).
-Also, the dropout rate for all best performing models is $0.6$ for both hidden layers, while the number of units in those varies between $64$ and $128$ 
-for both layers between input and output, while the worse models exhibit only $32$ neurons in the second hidden layer.
-In this case, a higher number of neurons in those layers appears to better capture the effects of the input features on \code{xsell}.
-
 \begin{table}[!htbp] \centering 
   \caption{Resulting statistics of 324 hyperparameter tuning model runs} 
   \label{tab_hypertune} 
@@ -285,17 +275,38 @@ $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & 
 \hline \\[-1.8ex] 
 \end{tabular} 
 \end{table} 
+It is noteworthy that this evaluation metric only varies by five percentage points from the best ($65.6\%$) to the worst model ($60.2\%$).
+Also, the dropout rate for all best performing models is $0.6$ for both hidden layers, while the number of units in those varies between $64$ and $128$ 
+for both layers between input and output.
+In contrast to that the least preferable models exhibit only $32$ neurons in the second hidden layer.
+In this case, a higher number of neurons in those layers appears to better capture the effects of the input features on \code{xsell}.
+The winning model used ten training epochs, that means the model ran ten times before stopping.
+This value is rather low\footnote{I tried epoch values of 5, 10, and 30 for the tuning routine.} and suggests an advantage of stopping early to avoid overfitting. 
+Finally, the size of the batches---that is the number of samples sent back and forth through the network at once\citep{cholletInterfaceKeras2017}---apppears to not have an obvious impact
+on model performance. 
+
+
+Even though this routine identified the best out of 324 models, it only tested three different values for eight hyperparameters in two seperate runs.
+Due to the computational complexity, important parameters such as the $learning rate$ was not included.
+Furthermore, I only tested three more or less arbitrarily chosen discrete values for the included model characteristics---it is therefore obvious that
+better models do exist. It is however difficult to identify them with the grid method and limited computational resources.
 
 \subsection{Comparing the Predicions of the ANN with the Benchmark Logit Model}
 
-\begin{figure}[ht]
-	\centering
-  \includegraphics[scale=0.63]{figures/roc_auc_comp.pdf}
-	\caption{ROC curve comparison between benchmark logit and hyperparameter-tuned neural network predictions}
-	\label{fig_roc}
-\end{figure}
-
-
+The ANN from the previous section with the highest validation accuracy is furthermore applied to the remaining unseen test data\footnote{20\% 
+of the 10,000 observations in the data set were used for testing, while the remaining 8,000 observations form the training set. Out of those, I reserved
+2,400 rows (30\%) as a holdout validation sample for cross-validation during the fitting process}.
+To assess the quality of the model, this paper now compares the resulting model statistics and confusion matrices of the discussed ANN with those of a 
+simple logit model based on the same 74 input features in the neural network\footnote{In fact, this logit model has a relatively simple functional form, 
+since it throws in every feature at hand without any selection mechanism or concern for multicolllinearity.
+However, those features have undergone the same extensive feature engineering process as described for the ANN.
+Hence, a lot of concerns are dealt with, e.g. though not functionally mapped, the logit model incorporates non-linear effects of \code{age} through binning.}.
+Table \ref{tab_comparemodel} displays all relevant model performance metrics from accuracy to kappa and each confusion matrix.
+To a surprise, there is no apparent difference in model accuracy between the hyperparameter tuned ANN and the simple benchmark logit model.
+The reference model even predicts \code{xsell} 0.4 percentage points more accurate\footnote{Due to the small test set sample size of 2,000 this 
+effect might not be statistically significant.}.
+Since 50\% of all customers in the data set made a purchase, this is the benchmark accuracy for any predictive model.
+Both the ANN and logit model in this case yield a roughly 29\% increase in accuracy compared to a coin toss.
 %Comparison of Model Statistics
 \begin{table}[!htbp] \centering
 \caption{Model performance comparison---statistics and confusion matrix}
@@ -321,6 +332,25 @@ Prevalence & 0.5023 &  & Prevalence & 0.5023 &  \\
 \end{tabular}
 }
 \end{table}
+Nevertheless, both models produce structurally different predictions.
+This becomes clear when comparing sensitivity (true positive rate) and specificity (true negative rate).
+The ANN is relatively better at predicting customers that actually buy another product (\code{xsell = 1}),
+while the logit model more accurately predicts negative outcomes.
+This has far-reaching implications for business applications, which are further elaborated on in chapter~\ref{sec_man_impl}.
+
+Another widely used visual tool and metric for model comparison in machine learning is the receiver operating characteristics curve (ROC) and the associated
+area under curve (AUC) \citep{fawcettIntroductionROCAnalysis2006}.
+Figure \ref{fig_roc} plots both ROC curves and the AUC in a single plot---the curves are visually inspected almost identical.
+Quantified by the AUC, the ANN performs 0.9 percentage points better than the logit model at 69.3\%.
+
+\begin{figure}[ht]
+	\centering
+  \includegraphics[scale=0.63]{figures/roc_auc_comp.pdf}
+	\caption{ROC curve comparison between benchmark logit and hyperparameter-tuned neural network predictions}
+	\label{fig_roc}
+\end{figure}
+
+
 
 
 
@@ -343,7 +373,8 @@ Prevalence & 0.5023 &  & Prevalence & 0.5023 &  \\
 
 
 
-\section{Managerial and Research Implications}
+\section{Managerial and Research Implications} \label{sec_man_impl}
+Include discussion of sensitivity vs. specificity here.
 \section{Conclusion}
 
 
@@ -351,7 +382,14 @@ Prevalence & 0.5023 &  & Prevalence & 0.5023 &  \\
 
 \clearpage
 \appendix
-\section{R Code}
+\section{Appendix}
+\begin{figure}[ht]
+	\centering
+  \includegraphics[scale=0.8]{figures/corrplot.pdf}
+	\caption{Correlation of feature engineered variables with xsell}
+	\label{fig_corr}
+\end{figure}
+
 
 \clearpage
 \bibliography{library}
