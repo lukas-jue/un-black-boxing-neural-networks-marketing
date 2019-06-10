@@ -25,7 +25,7 @@
 \usepackage[left=3cm, right=2.5cm, top=2.5cm]{geometry}
 
 \pagestyle{empty}
-\parindent 0cm
+\parindent 0.0cm
 \renewcommand{\baselinestretch}{1}
 \newcommand{\bs}{\boldsymbol}
 \renewcommand{\familydefault}{cmr} % alternative: cmss
@@ -135,8 +135,8 @@ This algorithm first replaces missing numeric (factor) variables with the median
 as weights to replace \code{NA's} with the weighted average (the value with the highest proximity) of the non-missing values and repeats this for a
 pre-defined number of iterations\footnote{After four iterations the out-of-bag error did not decrease visibly anymore, hence four iterations were chosen}
  \citep{liawClassificationRegressionRandomForest2002}.
-I furthermore bin the continuous features \code{age}, \code{entry\_age} and \code{last\_acc}\footnote{Those two features exhibit a highly non-linear relationship.
-According to the universal approximation theorem, a 
+I furthermore bin the continuous features \code{age}, \code{entry\_age} and \code{last\_acc}\footnote{Those three features exhibit a highly
+non-linear relationship. According to the universal approximation theorem, a 
 neural network with enough units in a hidden layer can approximate any continuous function \citep{hornikApproximationCapabilitiesMultilayer1991}.
 Since the best neural network will be found by trying out different hyperparameters, including some which would not be "enough" hidden layer units, I bin
 those two variables to make sure that this non-linear relationship can be taken into account by the model in any case. Also, the benchmark logit model
@@ -153,9 +153,6 @@ The feature engineered data set consists of $N=72$ input variables that will be 
 \end{figure}Figure \ref{fig_hist} displays the histograms for each
 of those features.
 
-
-
-
 \begin{figure}[ht]
 	\centering
   \includegraphics[scale=0.8]{figures/corrplot.pdf}
@@ -168,7 +165,8 @@ of those features.
 While the previous section discussed the steps required to transform the data to a suitable format for an ANN,
 this section will describe the basic architecture of this classification method.
 This study uses the \proglang{R} interface \pkg{keras} \citep{cholletInterfaceKeras2017} to the popular same name \proglang{Python} library.
-This high-level API enables an easier way to access the features of Google's \pkg{TensorFlow} \citep{abadiTensorFlowLargeScaleMachine2015}.\\
+This high-level API enables an easier way to access the features of Google's \pkg{TensorFlow} \citep{abadiTensorFlowLargeScaleMachine2015}.
+
 The neural network in this study is a common feedforward network which uses the backpropagation algorithm to adjust its weights \citep{werbosBackpropagationTimeWhat1990}.
 Based on the feature engineering process described in the previous chapter, the ANN has $n_x = 74$ inputs $X_i$, 
 two hidden layers with neurons $H_i^l$ referring to the $i^{th}$ neuron in the $l^{th}$ hidden layer. 
@@ -183,19 +181,21 @@ To avoid overfitting, the model implements dropout for the hidden layers.
 This process randomly drops units from the ANN and thus leads to a more generalizable model \citep{srivastavaDropoutSimpleWay2014}.
 Mitigating the risk of overfitting to the training data is also one key objective of the next section.
 
-\subsection{Cross-validation and Hyperparameter Tuning}
+\subsection{Cross-validation and Hyperparameter Tuning} \label{sec_crossval}
 After setting up the basic architecture of the neural net, this section describes the process that leads to the \textit{best} model\footnote{as mentioned earlier, this is not the best model \textit{existing}, but \textit{found}.}.
 An important feature of the \textit{best} model is that it does not memorize the exact relationships in the training data set---overfitting---but
 rather learns the generalizable underlying mechanisms an thereby performs well on the holdout validation data set. 
 For this purpose I first describe the optimization of the ANN through cross-validating predictions of several training epochs on a holdout 
 sample and then introduce hyperparameter tuning---a process that leads to the most desirable configuration of the ANN by
-running many combinations of model specifications. \\
+running many combinations of model specifications.
+
 To compile the ANN, I use the adaptive moment estimation algorithm \code{Adam} \citep{kingmaAdamMethodStochastic2014}
 which is recommended as the go-to gradient descent optimizer \citep{ruderOverviewGradientDescent2016}.
 This optimizer minimizes the cross-entropy loss \citep{zhangGeneralizedCrossEntropy2018} for each training epoch and accordingly updates the weights
 for the next model.
 Figure \ref{fig_history} shows the training history of the chosen ANN over ten epochs and the cross-entropy loss in the top pane, and the accuracy
-in the bottom part, each for the training and validation data set. \\
+in the bottom part, each for the training and validation data set.
+
 \begin{figure}[ht]
 	\centering
   \includegraphics[scale=0.8]{figures/train_history.pdf}
@@ -207,36 +207,85 @@ and true negatives in both data sets, but more importantly, gives an indication 
 If the training accuracy kept steadily increasing, while the validation accuracy kept relatively constant, the model would overfit---which means
 that the model is not generalizable beyond the training data set \citep{hansenNeuralNetworkEnsembles1990}.
 As exhibited in figure \ref{fig_history}, both accuracies are relatively constant and equal during the last training epochs.
-This is a strong indication that the model does not overfit and will perform similarly on the test or out-of-time data. \\
+This is a strong indication that the model does not overfit and will perform similarly on the test or out-of-time data.
+
 However, one question remains unanswered with cross-validation: Which model architecture leads to the most accurate predictions?
 Hyperparameter tuning provides a remedy to this issue \citep{bergstraRandomSearchHyperparameter2012}.
 In short, this process runs numerous models with combinations of hyperparameters\footnote{Hyperparameters refer to the specifications of an ANN,
-such as number of units per hidden layer, dropout rate and weights, but also different optimization algorithms and activation functions \citep{bengioGradientbasedOptimizationHyperparameters2000}}.
+such as number of units per hidden layer, dropout rate and weights, but also different optimization algorithms and activation functions \citep{bengioGradientbasedOptimizationHyperparameters2000}}. 
+The model with the highest \code{val\_acc} is then chosen to be the \textit{best} model for prediction of \code{xsell}.
 This study uses the "naive" grid method, which runs all possible combinations of pre-defined values for hyperparameters\footnote{I use each three different values of the hyperparameters \code{val\_acc}, \code{acc}, \code{units1}, \code{dropout1}, \code{units2}, \code{dropout2}, \code{epochs} and \code{batch}}.
-The model with the highest \code{val\_acc} is then chosen to be the \textit{best} model for prediction for this data set.
 However, this method is computationally expensive.
 It requires $N=a^b$ different models, where $a$ is the number of discrete values for each parameter and $b$ is the 
 number of hyperparameters to be tuned.
 Running two separate sets of hyperparameter combinations for 324 different models took roughly five hours on a standard consumer laptop.
 It can be assumed that this limited set of combinations did by far not yield the best model.
 However, this naive grid method needs an exponentially increasing number of different models and thus gets difficult to handle quite quickly.
-Possible solutions to this problem is random search, which is even more efficient than grid search \citep{bergstraRandomSearchHyperparameter2012}.
-
+A possible solution to this problem is random search, which is even more efficient than grid search \citep{bergstraRandomSearchHyperparameter2012}.
+By cross-validating the predictions with a loss function and by tuning the ANN's hyperparameter, 
+this section described the approach to finding the most suitable model for the prediction task at hand.
+The next part turns to prediction explanation---a key discussion point and critique of neural networks
 
 \subsection{Local Interpretable Model-agnostic Explanation (LIME)}
 In contrast to traditional regression-based methods that yield beta-coefficients and enable the construction of a functional form of 
-the underlying mechanisms in the data, a neural network does not provide an easily interpretable function that links $Y$ to $X_i$.
+the underlying mechanisms in the data, a neural network does not provide an easily interpretable function that links $Y_i$ to $X_i$.
 A common criticism of ANN hence is the "black-box"-argument \citep{benitezAreArtificialNeural1997, dayhoffArtificialNeuralNetworks2001}.
 Though the model might yield more accurate predictions, there is no clear answer to the question why the model predicted those particular values
-or which features contributed by how much to that. \\
+or which features contributed by how much to that.
+
 With the development of new methods that address this problem, an ANN is less a black box.
 Consistent with the research question to uncover factors that drive cross-sell, 
 this section focuses on the Local Interpretable Model-agnostic Explanation (LIME) introduced by \cite{ribeiroWhyShouldTrust2016a} as a methodology
 to assess factor importance on a single customer level\footnote{Other tools such as neural interpretation diagrams, Garson's algorithm, sensitivity analysis or randomized approaches
 \citep{oldenIlluminatingBlackBox2002} offer similar explanations on an aggregate level. However, covering those is beyond the scope of this paper.}.
+LIME uses a trick to come up with an interpretable explanation: While the highly non-linear function of the ANN is unknown over the total space,
+it can be approximated locally by an easier, readily interpretable model such as a linear regression or a decision tree.
+
+While those models do match the functional form of the neural network at all globally, they can yield accurate \textit{local} approximations
+\citep[see figure 3 for a visual example]{ribeiroWhyShouldTrust2016a}.
+Turning to the task at hand, this paper uses a multiple linear regression with the ten most important features for every customer.
+LIME permutes every observation and calculates the \code{gower}-distance between the observation and the permutation \citep{pedersenUnderstandingLime2018}.
+It then fits a forward-selection procedure on the basis of a ridge regression \citep{pedersenPackageLimeLocal2018} to identify the ten most 
+important features, weighted by the distance calculated earlier.
+Following \cite{ribeiroWhyShouldTrust2016a}, the linear regression coefficients are then reported as a locally accurate approximation of feature importance.
+This method hence enables to go beyond the typical "black-box" description of a neural network.
+While this chapter described the implemented methods theoretically, the remainder of this paper reports and interprets the results of those 
+machine learning techniques applied on the cross-sell data set.
 
 \section{Results and Model Comparison}
+This section proceeds as follows: First, it reports the results of the hyperparameter tuning and cross-validation and the resulting optimal ANN architecture.
+The second part then compares the predictions of the described neural network to a simple benchmark logit model.
+It concludes by reporting the feature importance for individual customers derived by LIME.
+
 \subsection{Choosing the Neural Network Architecture}
+The task of choosing the \textit{best} ANN architecture is not trivial. 
+Using the approach described in section \ref{sec_crossval}, I ran a total of 324 different models, each with different combinations of hyperparameters.
+Ranked by $val\_acc$, table \ref{tab_hypertune} shows the top five and bottom two models by validation accuracy with respective model specifications.
+It is noteworthy that this evaluation metric only varies by five percentage points from the best ($65.6\%$) to the worst model ($60.2\%$).
+Also, the dropout rate for all best performing models is $0.6$ for both hidden layers, while the number of units in those varies between $64$ and $128$ 
+for both layers between input and output, while the worse models exhibit only $32$ neurons in the second hidden layer.
+In this case, a higher number of neurons in those layers appears to better capture the effects of the input features on \code{xsell}.
+
+\begin{table}[!htbp] \centering 
+  \caption{Resulting statistics of 324 hyperparameter tuning model runs} 
+  \label{tab_hypertune} 
+\begin{tabular}{@{\extracolsep{5pt}} ccccccccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+rank & val\_acc & acc & units1 & dropout1 & units2 & dropout2 & epochs &batch \\ 
+\hline \\[-1.8ex] 
+1 & $0.656$ & $0.654$ & $64$ & $0.600$ & $128$ & $0.600$ & $10$ & $100$ \\ 
+2 & $0.654$ & $0.692$ & $128$ & $0.600$ & $64$ & $0.600$ & $30$ & $150$ \\ 
+3 & $0.653$ & $0.674$ & $64$ & $0.600$ & $64$ & $0.600$ & $30$ & $100$ \\ 
+4 & $0.651$ & $0.658$ & $64$ & $0.600$ & $64$ & $0.600$ & $10$ & $100$ \\ 
+5 & $0.651$ & $0.673$ & $64$ & $0.600$ & $128$ & $0.600$ & $30$ & $50$ \\ 
+$\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & \dots  \\
+323 & $0.604$ & $0.731$ & $64$ & $0.200$ & $32$ & $0.400$ & $30$ & $128$ \\ 
+324 & $0.602$ & $0.735$ & $64$ & $0.200$ & $32$ & $0.200$ & $30$ & $128$ \\ 
+\hline \\[-1.8ex] 
+\end{tabular} 
+\end{table} 
+
 \subsection{Comparing the Predicions of the ANN with the Benchmark Logit Model}
 
 \begin{figure}[ht]
@@ -272,26 +321,6 @@ Prevalence & 0.5023 &  & Prevalence & 0.5023 &  \\
 \end{tabular}
 }
 \end{table}
-
-\begin{table}[!htbp] \centering 
-  \caption{Resulting statistics of 324 hyperparameter tuning model runs} 
-  \label{tab_hypertune} 
-\begin{tabular}{@{\extracolsep{5pt}} ccccccccc} 
-\\[-1.8ex]\hline 
-\hline \\[-1.8ex] 
-rank & val\_acc & acc & units1 & dropout1 & units2 & dropout2 & epochs &batch \\ 
-\hline \\[-1.8ex] 
-1 & $0.656$ & $0.654$ & $64$ & $0.600$ & $128$ & $0.600$ & $10$ & $100$ \\ 
-2 & $0.654$ & $0.692$ & $128$ & $0.600$ & $64$ & $0.600$ & $30$ & $150$ \\ 
-3 & $0.653$ & $0.674$ & $64$ & $0.600$ & $64$ & $0.600$ & $30$ & $100$ \\ 
-4 & $0.651$ & $0.658$ & $64$ & $0.600$ & $64$ & $0.600$ & $10$ & $100$ \\ 
-5 & $0.651$ & $0.673$ & $64$ & $0.600$ & $128$ & $0.600$ & $30$ & $50$ \\ 
-$\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & \dots  \\
-323 & $0.604$ & $0.731$ & $64$ & $0.200$ & $32$ & $0.400$ & $30$ & $128$ \\ 
-324 & $0.602$ & $0.735$ & $64$ & $0.200$ & $32$ & $0.200$ & $30$ & $128$ \\ 
-\hline \\[-1.8ex] 
-\end{tabular} 
-\end{table} 
 
 
 
