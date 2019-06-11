@@ -221,7 +221,7 @@ By cross-validating the predictions with a loss function and by tuning the ANN's
 this section described the approach to finding the most suitable model for the prediction task at hand.
 The next part turns to prediction explanation---a key discussion point and critique of neural networks
 
-\subsection{Local Interpretable Model-agnostic Explanation (LIME)}
+\subsection{Local Interpretable Model-agnostic Explanation (LIME)} \label{sec_lime_theory}
 In contrast to traditional regression-based methods that yield beta-coefficients and enable the construction of a functional form of 
 the underlying mechanisms in the data, a neural network does not provide an easily interpretable function that links $Y_i$ to $X_i$.
 A common criticism of ANN hence is the "black-box"-argument \citep{benitezAreArtificialNeural1997, dayhoffArtificialNeuralNetworks2001}.
@@ -231,18 +231,18 @@ or which features contributed by how much to that.
 With the development of new methods that address this problem, an ANN is less a black box.
 Consistent with the research question to uncover factors that drive cross-sell, 
 this section focuses on the Local Interpretable Model-agnostic Explanation (LIME) introduced by \cite{ribeiroWhyShouldTrust2016a} as a methodology
-to assess factor importance on a single customer level\footnote{Other tools such as neural interpretation diagrams, Garson's algorithm, sensitivity analysis or randomized approaches
+to assess feature importance on a single customer level\footnote{Other tools such as neural interpretation diagrams, Garson's algorithm, sensitivity analysis or randomized approaches
 \citep{oldenIlluminatingBlackBox2002} offer similar explanations on an aggregate level. However, covering those is beyond the scope of this paper.}.
 LIME uses a trick to come up with an interpretable explanation: While the highly non-linear function of the ANN is unknown over the total space,
 it can be approximated locally by an easier, readily interpretable model such as a linear regression or a decision tree.
 
-While those models do match the functional form of the neural network at all globally, they can yield accurate \textit{local} approximations
+While those models globally do not match the functional form of the neural network at all, they can yield accurate \textit{local} approximations
 \citep[see figure 3 for a visual example]{ribeiroWhyShouldTrust2016a}.
 Turning to the task at hand, this paper uses a multiple linear regression with the ten most important features for every customer.
 LIME permutes every observation and calculates the \code{gower}-distance between the observation and the permutation \citep{pedersenUnderstandingLime2018}.
 It then fits a forward-selection procedure on the basis of a ridge regression \citep{pedersenPackageLimeLocal2018} to identify the ten most 
 important features, weighted by the distance calculated earlier.
-Following \cite{ribeiroWhyShouldTrust2016a}, the linear regression coefficients are then reported as a locally accurate approximation of feature importance.
+Following \cite{ribeiroWhyShouldTrust2016a}, the linear regression coefficients ("weights") are then reported as a locally accurate approximation of feature importance.
 This method hence enables to go beyond the typical "black-box" description of a neural network.
 While this chapter described the implemented methods theoretically, the remainder of this paper reports and interprets the results of those 
 machine learning techniques applied on the cross-sell data set.
@@ -281,7 +281,7 @@ for both layers between input and output.
 In contrast to that the least preferable models exhibit only $32$ neurons in the second hidden layer.
 In this case, a higher number of neurons in those layers appears to better capture the effects of the input features on \code{xsell}.
 The winning model used ten training epochs, that means the model ran ten times before stopping.
-This value is rather low\footnote{I tried epoch values of 5, 10, and 30 for the tuning routine.} and suggests an advantage of stopping early to avoid overfitting. 
+This value is rather low\footnote{I tested epoch values of 5, 10, and 30 for the tuning routine.} and suggests an advantage of stopping early to avoid overfitting. 
 Finally, the size of the batches---that is the number of samples sent back and forth through the network at once\citep{cholletInterfaceKeras2017}---apppears to not have an obvious impact
 on model performance. 
 
@@ -351,10 +351,18 @@ Quantified by the AUC, the ANN performs 0.9 percentage points better than the lo
 \end{figure}
 
 
-
-
-
 \subsection{Beyond the Black Box: Feature Importance with LIME}
+The previous section introduced the implemented ANN model specification and reported the results in terms of predictive performance.
+However, prediction is only one part of the research question.
+The other---equally important question to address---is explainability.
+Out-of the box, machine learning algorithms such as ANN are indeed a "black-box" and thus it is hard to understand why the model predicted which outcomes.
+LIME, as introduced theoretically in section \ref{sec_lime_theory}, provides insights into the reasoning of why the model came to a certain
+conclusion by locally fitting an explainable model and reporting the resulting feature weights as a measure for its importance to the prediction.
+In this paper, I focus on explanations for individual observations, i.e. individual customers.
+A focus on explaining feature importance on a global level would be the next step.
+However, the limited scope of this paper does not permit a thorough discussion of both.
+I believe that in a business setting, it is crucial to understand why the model predicted a certain outcome for cross selling of an individual customer.
+The remainder of this section therefore focuses on this explanation only.
 
 \begin{figure}[ht]
 	\centering
@@ -363,17 +371,49 @@ Quantified by the AUC, the ANN performs 0.9 percentage points better than the lo
 	\label{fig_lime_four}
 \end{figure}
 
+Figure \ref{fig_lime_four} visualizes the results of \pkg{lime}\code{::explain()} for the first four customers in the test data set.
+For each of those customers, the ten most important features are reported in descending order of their influence on the model's prediction.
+$Label$ is the model's prediction whether a customer buys another product, $probability$ gives a degree of the model's certainty in the prediction,
+and $explanation\ fit$ reports the locally approximated model's $R^2$ with the ten most important features utilized.
+It is apparent that the features that exhibit the highest correlation with \code{xsell} also play the biggest role for those four customers 
+(see figure \ref{fig_corr} in the appendix for a graphical representation of correlation in the data set). 
+
+A red bar indicates that the particular value of this feature in this case contradicts the model's conclusion,
+while a green bar shows supporting contributions to the model's prediction.
+Whether the customer received an advertisement mail about opening a checking account (\code{giro\_mailing\_X1}) shows the largest weight from the regression model in every one of the four cases.
+Also the group with the lowest days passed since the customer last opened an account (\code{last\_acc\_bin1}) show a very large contribution to the 
+prediction in those four cases.
+Additionally, the customers' age seems to have a big impact on cross-sell predictions---its binned version is consistently included as a top reason for the predictions.
+However, note that no generalization on the entire data set is possible from this interpretation, since it only explains individual predictions.
+A first step towards a general statement about characteristics of the customer base is looking at the distribution of features split by whether the customer
+opened a checking account or not.
+For \code{age}, the violin plot in figure \ref{fig_violin_age} shows a striking difference in the age distribution.
+Younger customers tend to more often cross-buy.
+However, this assessment is only descriptive in nature without any underlying statistical modeling.
+
+Combining the LIME explanations with the actual values for those customers would now enable to act on those results.
+The following section further elaborate on this issue and discusses the managerial implications that those methods bring with.
+
 \begin{figure}[ht]
 	\centering
   \includegraphics[scale=0.83]{figures/violin_age_xsell.pdf}
 	\caption{Individual variable assessment---violin plot of xsell vs. age}
-	\label{fig_lime_four}
+	\label{fig_violin_age}
 \end{figure}
 
 
 
 
 \section{Managerial and Research Implications} \label{sec_man_impl}
+This section first highlights managerial implications that can be derived from this study and then outlines future research areas in this field.
+Looking at the accuracy of the ANN compared to a simple benchmark logit model one recommendation for practice is obvious:
+Do not use neural networks in this particular business setting.
+They are computationally expensive and provide no overall predictive advantage to way simpler models such as logit.
+Possible reasons for the disappointing ANN performance could be the lack of enough data---neural networks require large data sets accurately learning
+the underlying relationships.
+Also, neural networks are better suited for other more complex tasks such as image recognition \citep{estevaDermatologistlevelClassificationSkin2017} and speech \citep{hintonDeepNeuralNetworks2012} or text recognition \citep{jaderbergSyntheticDataArtificial2014}.
+In that case, the performance difference to simple regression based methods is extraordinary and has led to a widespread adoption of ANNs in practice.
+
 Include discussion of sensitivity vs. specificity here.
 \section{Conclusion}
 
