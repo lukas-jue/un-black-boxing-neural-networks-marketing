@@ -1,0 +1,49 @@
+\begin{lstlisting}[language=R,caption={Using the ANN to predict the previously unseen out-of-time data set}, label=lst_oot]
+#############################################
+###   Apply model to out-of-time sample   ###
+#############################################
+
+# import oot data set
+xsell_oot <- read.csv("xsell_oot.csv")
+
+# create new variable tenure
+xsell_oot$tenure <- xsell_oot$age - xsell_oot$entry_age
+
+# data cleaning, replace NAs in char-variables with "None_or_missing"
+xsell_oot <- xsell_oot %>%
+  replace_na(list(pref_device = "None_or_missing"))
+xsell_oot <- xsell_oot %>%
+  replace_na(list(occupation = "None_or_missing"))
+
+# all character columns to factor:
+xsell_oot <- mutate_if(xsell_oot, is.character, as.factor)
+#additional numeric variables that should rather be treated as factors
+xsell_oot$car_seg <- as.factor(xsell_oot$car_seg)
+xsell_oot$acad <- as.factor(xsell_oot$acad) # remove if strange results
+xsell_oot$giro_mailing <- as.factor(xsell_oot$giro_mailing) # remove if strange results
+xsell_oot$pop_km <- as.factor(xsell_oot$pop_km)
+xsell_oot$ppower <- as.factor(xsell_oot$ppower)
+
+# Remove unnecessary data and clean data set
+xsell_oot_data_tbl <- xsell_oot %>%
+  select(-X) %>% #removes ID
+  # if you don't want to run a random forest for NA imputation, you can do apply of the two easier fixes to NA's:
+  #drop_na() #%>% # removes all NA's. Bad Solution! Improve! Removes 70% of observations
+  na.roughfix() #replaces NA's: Numeric with median, factor with mode
+
+# Impute NAs with a Random Forest
+# can't do here, because there is no xsell
+#xsell_oot_data_tbl <- rfImpute(xsell ~ . ,xsell_oot_data_tbl, iter = 4, ntree=100) 
+
+# apply recipe to normalize, etc.
+x_valid_tbl <- bake(rec_obj, new_data = xsell_oot_data_tbl)
+
+# Predicted Class
+yhat_keras_class_vec_oot <- predict_classes(object = model_keras, x = as.matrix(x_valid_tbl)) %>%
+  as.vector()
+
+xsell_oot_incl_pred <- cbind(xsell_oot, yhat_keras_class_vec_oot)
+write.csv(xsell_oot_incl_pred, "xsell_oot_predicted.csv")
+
+      
+\end{lstlisting}

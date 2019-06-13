@@ -1,0 +1,72 @@
+\begin{lstlisting}[language=R,caption={Flagged neural net architecture for hyperparameter tuning}, label=lst_architecture]
+##########################################
+### keras neural network architecture ####
+##########################################
+
+# to be called by hyperpar_tuning_tf_runs.R
+
+# setting up flags for hyperparameter tuning
+FLAGS <- flags(
+  flag_integer("dense_units1", 8),
+  flag_numeric("dropout1", 0.6),
+  flag_integer("dense_units2", 64),
+  flag_numeric("dropout2", 0.6),
+  flag_integer("epochs", 30),
+  flag_integer("batch_size", 128)
+)
+
+
+# Setting up the ANN with Keras
+model_keras <- keras_model_sequential()
+
+model_keras %>% 
+  
+  # First hidden layer
+  layer_dense(
+    units              = FLAGS$dense_units1,
+    kernel_initializer = "uniform", 
+    activation         = "relu", 
+    use_bias           = TRUE,
+    bias_initializer   = 'zeros',
+    input_shape        = ncol(x_train_tbl)) %>% 
+  
+  # Dropout to prevent overfitting
+  layer_dropout(rate = FLAGS$dropout1) %>%
+  
+  # Second hidden layer
+  layer_dense(
+    units              = FLAGS$dense_units2,
+    kernel_initializer = "uniform",
+    use_bias           = TRUE,
+    bias_initializer   = 'zeros',
+    activation         = "relu") %>%
+  
+  # Dropout to prevent overfitting
+  layer_dropout(rate = FLAGS$dropout2) %>%
+
+  # Output layer
+  layer_dense(
+    units              = 1, 
+    kernel_initializer = "uniform", 
+    activation         = "sigmoid") %>% 
+  
+  # Compile ANN
+  compile(
+    optimizer = 'adam',
+    loss      = 'binary_crossentropy',
+    metrics   = c('accuracy')
+  )
+
+
+history <- fit(
+  object           = model_keras, 
+  x                = as.matrix(x_train_tbl), 
+  y                = y_train_vec,
+  batch_size       = FLAGS$batch_size, 
+  epochs           = FLAGS$epochs,
+  validation_split = 0.3,
+  verbose          = 0
+)
+
+      
+\end{lstlisting}

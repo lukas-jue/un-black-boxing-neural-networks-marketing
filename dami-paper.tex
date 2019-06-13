@@ -65,8 +65,11 @@
 % \vspace*{1cm}
  \includegraphics[width=0.35\textwidth]{GU-Logo-blau-CMYK.eps} \vspace{2cm}
   
-  {\Large{\bf Predicting Cross-Sell with Artificial Neural Networks}} \newline
-  {\Large{An Empirical Study of ING's Customer Data}} \vspace{0.5cm}
+%  {\Large{\bf Predicting Cross-Sell with Artificial Neural Networks}} \newline
+%  {\Large{An Empirical Study of ING's Customer Data}} \vspace{0.5cm}
+{\Large{\bf Un-Black-Boxing Artificial Neural Networks}} \newline
+{\Large{Explaining Cross-Sell Predictions with Bank Customer Data}} \vspace{0.5cm}
+
 
   Seminar Thesis \\\vspace{2cm}
   submitted to \\\vspace{0.5cm}
@@ -120,7 +123,7 @@ are likely open a checking account in the future
 This section provides an overview over the implemented methodology by first outlining the feature engineering process that transforms the original data set
 as required by neural networks.
 The second part then describes the artificial neural network and its initial architecture, while the third part describes the hyperparameter tuning process
-that leads to the \textit{best} model\footnote{This model is definitely not the best model \textit{existing}, but the best model \textit{found} through the trial-and-error tuning process.}.
+that leads to the \textit{best} model\footnote{This model is definitely not the best model \textit{existing}, but the best model \textit{found} through the trial-and-error tuning process described in detail in section \ref{sec_crossval}.}.
 Lastly, this section addresses a common criticism of machine learning technologies in general and neural networks in particular---the 
 uninterpretable black box---by introducing the Local Interpretable Model-agnostic Explanation (LIME) as a method to 
 "look under the hood" of a neural network and determine which features contributed by how much to a prediction.
@@ -385,11 +388,19 @@ Also the group with the lowest days passed since the customer last opened an acc
 prediction in those four cases.
 Additionally, the customers' age seems to have a big impact on cross-sell predictions---its binned version is consistently included as a top reason for the predictions.
 However, note that no generalization on the entire data set is possible from this interpretation, since it only explains individual predictions.
+
 A first step towards a general statement about characteristics of the customer base is looking at the distribution of features split by whether the customer
 opened a checking account or not.
 For \code{age}, the violin plot in figure \ref{fig_violin_age} shows a striking difference in the age distribution.
 Younger customers tend to more often cross-buy.
+Looking at the correlation of all features with \code{xsell} in figure \ref{fig_corr} in the Appendix, the youngest age group shows the highest positive correlation after \code{giro\_mailing\_X1}.
+Receiving a mail with an offer to buy another product in every of the four individual explanations the leading feature that has the highest influence on
+the model's prediction, while it also displays the highest correlation with cross-sell.
+On the contradicting side, a missing preferred device displays the highest negative correlation,
+while it also comes up as the third most important feature in the individual LIME explanations.
 However, this assessment is only descriptive in nature without any underlying statistical modeling.
+Though a mere correlation does not imply causality, they can provide a first clue about general underlying mechanism and can validate the LIME results.
+Judging from the first four customers only, the locally fitted models' weights are proportional to the overall correlations.
 
 Combining the LIME explanations with the actual values for those customers would now enable to act on those results.
 The following section further elaborate on this issue and discusses the managerial implications that those methods bring with.
@@ -401,9 +412,6 @@ The following section further elaborate on this issue and discusses the manageri
 	\label{fig_violin_age}
 \end{figure}
 
-
-
-
 \section{Managerial and Research Implications} \label{sec_man_impl}
 This section first highlights managerial implications that can be derived from this study and then outlines future research areas in this field.
 Looking at the accuracy of the ANN compared to a simple benchmark logit model one recommendation for practice is obvious:
@@ -414,7 +422,27 @@ the underlying relationships.
 Also, neural networks are better suited for other more complex tasks such as image recognition \citep{estevaDermatologistlevelClassificationSkin2017} and speech \citep{hintonDeepNeuralNetworks2012} or text recognition \citep{jaderbergSyntheticDataArtificial2014}.
 In that case, the performance difference to simple regression based methods is extraordinary and has led to a widespread adoption of ANNs in practice.
 
-Include discussion of sensitivity vs. specificity here.
+Nevertheless, LIME  provides an important way to understand why the black-box ANN predicted cross-selling.
+This is important to first get an understanding which features are contributing by how much and in which direction.
+Out-of-the box, this would not be possible with ANNs.
+More importantly however, LIME builds trust in the prediction of an otherwise mysterious algorithm.
+By fitting a locally faithful and interpretable model, this new approach enables decision makers to assess the validity of the neural network's 
+predictions beyond typical performance measures such as accuracy and AUC \citep{ribeiroWhyShouldTrust2016a}.
+
+Still, this paper lacks a generalizeable explanation beyond simple descriptive metrics such as correlation (see figure \ref{fig_corr}) or distributions of observations by \code{xsell} as shown in figure \ref{fig_violin_age}.
+Though individual predictions can be explained by LIME, one cannot derive a truly general statement about the sample from it.
+In their research on LIME, \cite{ribeiroWhyShouldTrust2016a} suggest submodular picking of individual observation-level explanations in order to 
+derive generalizable insights into the black-box model.
+Simplified, they propose an algorithm that optimally picks the most representative individual observations for the entire sample.
+Unfortunately, the LIME-SP routine is so far only implemented in the original \proglang{Python} package and currently under development for the corresponding  \pkg{keras} \proglang{R} interface \citep{kavickyLocalInterpretableModelAgnostic2017}. 
+
+This empirical analysis suggests hints which customer groups are most likely to purchase another product.
+Most importantly, young customers tend to purchase more likely than old ones. The more recently a customer already cross-bought,
+the more likely it is that the bank can sell an additional product to this client again.
+Targeting those customer groups in particular could be a valid business strategy.
+However, more research would be necessary to establish a clear causal relationship between those variables.
+A neural network is definitely not the method of choice for this task---even though new developments such as LIME can greatly expand the trust and explainability of black-box models.
+
 \section{Conclusion}
 
 
@@ -430,6 +458,11 @@ Include discussion of sensitivity vs. specificity here.
 	\label{fig_corr}
 \end{figure}
 
+\section{R Source Code}
+\input{code/lst_main.tex}
+\input{code/lst_tuning.tex}
+\input{code/lst_architecture.tex}
+\input{code/lst_oot.tex}
 
 \clearpage
 \bibliography{library}

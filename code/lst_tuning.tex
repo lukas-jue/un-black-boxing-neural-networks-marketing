@@ -1,0 +1,70 @@
+\begin{lstlisting}[language=R,caption={Hyperparameter tuning routine}, label=lst_tuning]
+#####################################
+#### Hyperparameter tuning ##########
+#####################################
+
+# run the external script with defined flags as default
+training_run("keras_nnet_architecture.R")
+
+# !!CAUTION!! Combines every single combination (3^(#tuned parameters)), thus long runtime 
+# run various combinations of dropout1 and dropout2
+
+# Only Dropout tuning
+runs <- tuning_run("keras_nnet_architecture.R", runs_dir = "dropout_tuning", flags = list(
+  dropout1 = c(0.2, 0.4, 0.6),
+  dropout2 = c(0.2, 0.4, 0.6)
+))
+
+# run combinations of dense units, epochs and batch size
+runs <- tuning_run("keras_nnet_architecture.R", runs_dir = "runs/20190608_neurons_epochs_batch_tuning", flags = list(
+  #dropout1 = c(0.2, 0.4, 0.6),
+  #dropout2 = c(0.2, 0.4, 0.6),
+  dense_units1 = c(8, 64, 128),
+  dense_units2 = c(8, 64, 128),
+  epochs = c(5, 10, 30),
+  batch_size = c(50, 100, 150)
+))
+
+# only number of neurons per layer tuning
+runs <- tuning_run("keras_nnet_architecture.R", runs_dir = "number_neurons_tuning", flags = list(
+  dense_units1 = c(8, 32, 64),
+  dense_units2 = c(8, 32, 64)
+))
+
+
+######################################
+#### After-tunig processing ##########
+######################################
+
+# check latest run
+latest_run()
+
+# compare runs in interactive RStudio viewer
+compare_runs()
+
+# View the run with the highes val_acc
+view_run("runs/20190608_neurons_epochs_batch_tuning/2019-06-08T08-56-30Z")
+
+# compare runs in data frame
+runs1 <- ls_runs(runs_dir = "runs/20190607_dropout_neurons_epochs_tuning", order = metric_val_acc)
+runs2 <- ls_runs(runs_dir = "runs/20190608_neurons_epochs_batch_tuning", order = metric_val_acc)
+
+# combine both runs in one df
+runs <- rbind(runs1, runs2)
+
+# extract important information only for printing with stargazer
+runs_print <- runs %>%
+  arrange(desc(metric_val_acc)) %>% 
+  select(metric_val_acc, metric_acc, flag_dense_units1, flag_dropout1,
+         flag_dense_units2, flag_dropout2, flag_epochs, flag_batch_size)
+
+stargazer(runs_print[1:5,], summary = FALSE)
+stargazer(runs_print[323:324,], summary = FALSE)
+
+# move all runs into run/archive
+clean_runs()
+
+# extract and save certain model
+copy_run_files("runs/2019-06-08T00-38-43Z", to = "20190607-best-model")
+      
+\end{lstlisting}

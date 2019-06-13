@@ -1,0 +1,356 @@
+\begin{lstlisting}[language=R,caption={Main analysis}, label=lst_main]
+#############################################
+#####             Libraries             #####
+#############################################
+
+# clear workspace
+rm(list = ls())
+
+#install packages as required
+
+# Exception: Installing Keras is a little tricky. 
+# You additionally need a python installation on your machine
+#install_keras(method = "conda")
+
+# Load libraries
+library(keras)
+library(lime)
+library(tfruns)
+library(tidyquant)
+library(rsample)
+library(recipes)
+library(yardstick)
+library(corrr)
+library(randomForest)
+library(missForest)
+library(neuralnet)
+library(caret)
+library(dplyr)
+library(corrplot)
+library(pROC)
+library(processx)
+library(caret)
+library(e1071)
+library(stargazer)
+
+# set same seed for R, Python, NumPy and Tensorflow
+use_session_with_seed(42) 
+
+#############################################
+##  Data cleaning and Feature Engineering  ##
+#############################################
+
+# read and check data
+xsell_data_raw <- read.csv("xsell.csv", na.strings=c("", "NA"), stringsAsFactors = FALSE)
+glimpse(xsell_data_raw)
+summary(xsell_data_raw)
+
+# shuffle rows
+xsell_data_raw <- xsell_data_raw[sample(nrow(xsell_data_raw)),]
+
+# create new variable tenure
+xsell_data_raw$tenure <- xsell_data_raw$age - xsell_data_raw$entry_age
+
+# data cleaning, replace NAs in char-variables with "None_or_missing"
+xsell_data_raw <- xsell_data_raw %>%
+  replace_na(list(pref_device = "None_or_missing"))
+xsell_data_raw <- xsell_data_raw %>%
+  replace_na(list(occupation = "None_or_missing"))
+
+# all character columns to factor:
+xsell_data_raw <- mutate_if(xsell_data_raw, is.character, as.factor)
+#additional numeric variables that should rather be treated as factors
+xsell_data_raw$car_seg <- as.factor(xsell_data_raw$car_seg)
+xsell_data_raw$acad <- as.factor(xsell_data_raw$acad) # remove if strange results
+xsell_data_raw$giro_mailing <- as.factor(xsell_data_raw$giro_mailing) # remove if strange results
+xsell_data_raw$pop_km <- as.factor(xsell_data_raw$pop_km)
+xsell_data_raw$ppower <- as.factor(xsell_data_raw$ppower)
+
+# Remove unnecessary data and clean data set
+xsell_data_tbl <- xsell_data_raw %>%
+  select(-X) #%>% #removes ID
+  # if you don't want to run a random forest for NA imputation, you can do apply of the two easier fixes to NA's:
+  #drop_na() #%>% # removes all NA's. Bad Solution! Improve! Removes 70% of observations
+  #na.roughfix(xsell_data_raw) #replaces NA's: Numeric with median, factor with mode
+  
+# Impute NAs with a Random Forest
+xsell_data_tbl$xsell <- as.factor(xsell_data_tbl$xsell) # transform to factor for random forest imputation
+xsell_data_tbl <- rfImpute(xsell ~ . ,xsell_data_tbl, iter = 4, ntree=100) 
+xsell_data_tbl$xsell <- as.integer(ifelse(xsell_data_tbl$xsell == "0", 0, 1)) # transform back to numeric
+
+glimpse(xsell_data_tbl)
+
+# Split test/training sets
+train_test_split <- initial_split(xsell_data_tbl, prop = 0.8)
+train_test_split
+
+# Retrieve train and test sets
+train_tbl <- training(train_test_split)
+test_tbl  <- testing(train_test_split)
+
+# define features for binning
+to_bin <- c("age", "entry_age", "last_acc")
+
+# Create recipe
+rec_obj <- recipe(xsell ~ ., data = train_tbl) %>%
+  step_discretize(to_bin, options = list(cuts = 4)) %>%
+  step_dummy(all_nominal(), -all_outcomes()) %>%
+  step_center(all_predictors(), -all_outcomes()) %>%
+  step_scale(all_predictors(), -all_outcomes()) %>%
+  prep(data = train_tbl)
+
+# Apply recipe to predictors (all vars excluding xsell)
+x_train_tbl <- bake(rec_obj, new_data = train_tbl) %>% select(-xsell)
+x_test_tbl  <- bake(rec_obj, new_data = test_tbl) %>% select(-xsell)
+glimpse(x_train_tbl)
+
+# define response variables for training and testing sets
+y_train_vec <- pull(train_tbl, xsell)
+y_test_vec  <- pull(test_tbl, xsell)
+
+# visually check transformed data set with a histogram for each feature
+x_train_tbl %>% 
+  gather(colnames, xsell) %>% 
+  ggplot(aes(x = xsell)) + 
+    geom_histogram() +
+    facet_wrap(~colnames,
+               scales = 'free', 
+               ncol = 9)+
+  theme_bw()
+
+# correlation matrix
+correl_matrix <- cor(x_train_tbl,use="pairwise.complete.obs")
+# correlation plot
+corrplot(correl_matrix) 
+
+##############################################
+# Building the Artificial Neural Network #####
+##############################################
+
+# I tuned the hyperparameters by trying out 324 different models
+# See the scripts hyperpar_tuning_tf_runs.R and keras_nnet_architecture
+# I then use the "best" hyperparameters below according to the results of those runs
+
+# Setting up the ANN with Keras
+model_keras <- keras_model_sequential()
+
+# the hyperparameters inserted here were tuned with the hyperpar_tuning_tf_runs.R script
+model_keras %>% 
+  
+  # First hidden layer
+  layer_dense(
+    units              = 64,
+    kernel_initializer = "uniform", 
+    activation         = "relu", 
+    use_bias           = TRUE,
+    bias_initializer   = 'zeros',
+    input_shape        = ncol(x_train_tbl)) %>% 
+  
+  # Dropout to prevent overfitting
+  layer_dropout(rate = 0.6) %>%
+
+  # Second hidden layer
+  layer_dense(
+    units              = 128,
+    kernel_initializer = "uniform",
+    use_bias           = TRUE,
+    bias_initializer   = 'zeros',
+    activation         = "relu") %>%
+
+ # Dropout to prevent overfitting
+ layer_dropout(rate = 0.6) %>%
+
+  # Output layer
+  layer_dense(
+    units              = 1, 
+    kernel_initializer = "uniform", 
+    activation         = "sigmoid") %>% 
+  
+  # Compile ANN
+  compile(
+    optimizer = 'adam',
+    loss      = 'binary_crossentropy',
+    metrics   = c('accuracy')
+  )
+
+# print model architecture
+ model_keras
+
+# Tensorboard can be useful to follow along the training of complex models as it trains
+# Also, you can easily compare different models in one graph
+# in this case, this is not necessary, hence commented
+# launch TensorBoard (data won't show up until after the first epoch)
+ 
+# tensorboard("logs/run_1")
+
+history <- fit(
+  object           = model_keras, 
+  x                = as.matrix(x_train_tbl), 
+  y                = y_train_vec,
+  batch_size       = 100, 
+  epochs           = 10,
+  validation_split = 0.3,
+  # include callback below if you want to use tensorflow
+  #callbacks = callback_tensorboard("logs/run_1", write_images = TRUE),
+  verbose          = 1
+)
+
+## compare runs
+## In this example, I used three different callbacks for three different model specifications
+# tensorboard("logs")
+
+# Plot the training/validation history of the Keras model
+plot(history) +
+  theme_bw()
+
+##############################################
+## Extract Predictions from the Keras ANN ####
+##############################################
+
+# Predicted Class
+yhat_keras_class_vec <- predict_classes(object = model_keras, x = as.matrix(x_test_tbl)) %>%
+  as.vector()
+
+# Predicted Class Probability
+yhat_keras_prob_vec  <- predict_proba(object = model_keras, x = as.matrix(x_test_tbl)) %>%
+  as.vector()
+
+
+####################################################
+####       Model Comparison ANN/Logit      #########
+####################################################
+
+# run script that sets up a simple benchmark Logit model
+source("benchmark_logit_model.R", echo = TRUE)
+
+# compare ANN Model ROC curve to benchmark logit modek
+roc_comp <- roc(estimates_keras_tbl$truth,estimates_keras_tbl$class_prob, percent=TRUE, plot=TRUE, print.auc=TRUE,
+                print.auc.x = 90, print.auc.y = 85, grid=TRUE)
+roc_comp <- roc(xsell_valid$xsell,xsell_valid$pred_logit, percent=TRUE, plot=TRUE,
+                 print.auc=TRUE,grid=TRUE,  col = "red", print.auc.x = 90, print.auc.y = 75, add = TRUE)
+text(40,50, "Simple Benchmark Logit Model")
+text(33,40, "Hyperparameter-tuned ANN with Keras", col = "red")
+
+# compare model statistics (Confusion Matrix, Accuracy, Sensitivity, Recall, etc.)
+conf_matrix_keras <- confusionMatrix(as.factor(yhat_keras_class_vec),as.factor(estimates_keras_tbl$truth), 
+                             positive="1", dnn = c("Prediction", "Actual"))
+conf_matrix_logit <- confusionMatrix(as.factor(xsell_valid$predict),as.factor(xsell_valid$xsell), 
+                                   positive="1", dnn = c("Prediction", "Actual"))
+conf_matrix_keras
+conf_matrix_logit
+
+ConfMatK <- as.data.frame.matrix(conf_matrix_keras$table)
+stargazer(ConfMatK, head = FALSE, title = "Table", summary = FALSE)
+
+
+####################################################
+#### Evaluate Feature Importance with LIME #########
+####################################################
+
+# Setup
+class(model_keras)
+
+#Setup lime::model_type() function for keras
+#This specifies that the task at hand is a classification task
+model_type.keras.engine.sequential.Sequential <- function(x, ...) {
+  return("classification")
+  }
+
+
+# Setup lime::predict_model() function for keras
+predict_model.keras.engine.sequential.Sequential <- function(x, newdata, type, ...) {
+  pred <- predict_proba(object = x, x = as.matrix(newdata))
+  return(data.frame(Yes = pred, No = 1 - pred))
+  }
+
+
+# Test the predict_model() function
+predict_model(x = model_keras, newdata = x_test_tbl, type = 'raw') %>%
+  tibble::as_tibble()
+
+# Run lime() on training set
+explainer <- lime::lime(
+  x              = x_train_tbl, 
+  model          = model_keras, 
+  bin_continuous = FALSE
+)
+
+# Run explain() on explainer
+explanation <- lime::explain(
+  x_test_tbl[1:4, ], 
+  explainer      = explainer, 
+  n_labels       = 1, 
+  n_features     = 10,
+  kernel_width   = 0.5,
+  feature_select = "forward_selection"
+)
+
+# Plot feature importance
+plot_features(explanation, ncol = 2) #+
+  labs(title = "LIME Feature Importance Visualization",
+       caption = "Test data set, first four customers")
+
+plot_explanations(explanation) +
+  labs(title = "LIME Feature Importance Heatmap",
+       subtitle = "Hold Out (Test) Set, First Four Cases Shown") +
+  theme_bw()
+
+# Feature correlations to xsell
+corrr_analysis <- x_train_tbl %>%
+  mutate(xsell = y_train_vec) %>%
+  correlate() %>%
+  focus(xsell) %>%
+  rename(feature = rowname) %>%
+  arrange(abs(xsell)) %>%
+  mutate(feature = as_factor(feature)) 
+
+# Correlation visualization
+corrr_analysis %>%
+  ggplot(aes(x = xsell, y = fct_reorder(feature, desc(xsell)))) +
+  geom_point() +
+  # Positive Correlations - Contribute to xsell
+  geom_segment(aes(xend = 0, yend = feature), 
+               color = palette_light()[[2]], 
+               data = corrr_analysis %>% filter(xsell > 0)) +
+  geom_point(color = palette_light()[[2]], 
+             data = corrr_analysis %>% filter(xsell > 0)) +
+  # Negative Correlations - Prevent xsell
+  geom_segment(aes(xend = 0, yend = feature), 
+               color = palette_light()[[1]], 
+               data = corrr_analysis %>% filter(xsell < 0)) +
+  geom_point(color = palette_light()[[1]], 
+             data = corrr_analysis %>% filter(xsell < 0)) +
+  # Vertical lines
+  # geom_vline(xintercept = 0, color = palette_light()[[5]], size = 1, linetype = 2) +
+  # geom_vline(xintercept = -0.05, color = palette_light()[[5]], size = 1, linetype = 2) +
+  # geom_vline(xintercept = 0.05, color = palette_light()[[5]], size = 1, linetype = 2) +
+  # Aesthetics
+  theme_bw() + # theme_tq replaced because in conflict with randomForest package
+  labs(#title = "Cross Sell Correlation Analysis",
+       subtitle = paste("Negative correlations (prevent xsell),",
+                        "positive correlations (contribute to xsell)"),
+       x = "Correlation of feature with xsell",
+       y = "Feature Importance")
+
+# individual variable assessment: age
+train_tbl %>% 
+  ggplot(aes(x=as.factor(xsell), y=age))+
+  geom_jitter(shape = 1, alpha = 0.2) +
+  geom_violin(fill="blue", alpha = 0.2) +
+  labs(x = "xsell")+
+  theme_bw()
+
+# individual variable assessment: giro mailing
+table(as.factor(train_tbl$xsell), train_tbl$giro_mailing)
+
+# individual variable assessment: logins
+train_tbl %>% 
+  ggplot(aes(x=as.factor(xsell), y=logins))+
+  geom_jitter(shape = 1, alpha = 0.5) +
+  geom_violin(fill="blue", alpha = 0.2) +
+  ylim(0,10) +
+  theme_bw()
+
+table(train_tbl$xsell, train_tbl$gender)
+      
+\end{lstlisting}
