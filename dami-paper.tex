@@ -108,16 +108,35 @@
 
 
 \section{Introduction}
-\citep{hastieElementsStatisticalLearning2017}
-Include research question here \\
-\pkg{dplyr}
-\proglang{R}
-\code{a <- mutate(data, abc)}
-Identify  addtitional  sales  potential in the client base to increase customer value and loyalty. \newline
-Question: Will a customer buy an additional product? (yes/no) \newline
-Goal: identify characteristics of typical customers who open a checking account and predict which customers
-are likely open a checking account in the future
-\section{Theoretical Background on Cross-sell}
+
+The rise of machine learning techniques has come with a great increase
+of predictive accuracy in many settings \citep{jordanMachineLearningTrends2015}. The hype around those techniques has led to a widespread use of them in all kinds of fields in science and practice---from medicine to business or self-driving cars \citep{chenMachineLearningPrediction2017}.
+However, some of those methods are increasingly computationally expensive and might not in every case be superior to traditional regression-based methods such as a simple multivariate linear regression or logit models.
+
+This paper uses a data set from a large German bank with numerous customer characteristics to predict whether a customer buys another
+product---also referred to as cross-selling.
+The goal of this research is first to predict weather a customer will cross-buy and open a checking account and second to identify certain characteristics of typical customers that increase the likelihood of opening that account.
+Therefore, this paper introduces a complex ANN with optimized predictive power and compares the predictions to a simple logit model.
+One downside of ANN models in particular the lack of interpretability---they are widely regarded as black-boxes \citep{benitezAreArtificialNeural1997, dayhoffArtificialNeuralNetworks2001}.
+This paper addresses this shortcoming by implementing LIME---a method to explain individual predictions of neural networks \citep{ribeiroWhyShouldTrust2016a}.
+
+The paper is structured as follows: The first chapter gives a short introduction to cross-selling theory and is followed by the explanation of the implemented statistical methods.
+The subsequent chapter presents the empirical results and especially compares the ANN to the simple logit model.
+The paper concludes with implications for practitioners and outlines further research avenues.
+
+\section{A Short Primer on Cross-Sell}
+Cross-selling is an important action field for established companies with an existing customer base.
+Selling additional products to present customers taps into a readily accessible target group for additional sales potential.
+cite{felveyCrosssellingComputer1982} argues that a businesses' client base might already be more inclined to buy another product from the company that they already have a relationship with, compared to non-customers.
+Also, the cost of selling additional products to already existing customers is cheaper than targeting new ones \citep{reichheldZeroDefectionsQuality1990}.
+Benefits of cross-selling from the company point-of-view include increased switching costs for customers, while customers benefit from an easy integration
+of different products and a higher certainty about the quality of the new product \citep{kamakuraApplyingLatentTrait1991, kamakuraCrosssellingDatabaseMarketing2003}. 
+However, as in most business settings, there is no free lunch and hence cross-selling efforts are also associated with costs and risks.
+Apart from trivial costs for cross-selling efforts such as mailing or telephone campaigns, there is a significant churn risk involved.
+If not accurately targeted, customers can be annoyed by irrelevant and continuous advertisement and might eventually churn as a result \citep{keaveneyCustomerSwitchingBehavior1995}.
+Due to the significant sales potential on the one hand and costs and risks involved on the other hand, it is therefore paramount to identify the target group that is most likely to cross-buy another product.
+This paper addresses this issue and presents an Artificial Neural Network to accomplish that task in a most accurate way.
+
 
 \section{Methodology}
 This section provides an overview over the implemented methodology by first outlining the feature engineering process that transforms the original data set
@@ -151,13 +170,14 @@ Since a neural network cannot handle multi-categorical features, the routine dum
 Finally---to not distort the input weights for the first hidden layer and thus not negatively affect the prediction quality 
 \citep[pp. 398]{hastieElementsStatisticalLearning2017}---I center and scale all input features to exhibit $\bar{x}=0$ and $s=1$.
 The feature engineered data set consists of $n_x = 74$ input variables that will be used to predict cross-sell. 
-\begin{figure}[ht]
-	\centering
-  \includegraphics[scale=0.63]{figures/hist_all_features.pdf}
-	\caption{Histogram of all features after feature engineering process}
-	\label{fig_hist}
-\end{figure}Figure \ref{fig_hist} displays the histograms for each
-of those features.
+% uncommented due to page limitation
+%\begin{figure}[ht]
+%	\centering
+%  \includegraphics[scale=0.63]{figures/hist_all_features.pdf}
+%	\caption{Histogram of all features after feature engineering process}
+%	\label{fig_hist}
+%\end{figure}Figure \ref{fig_hist} displays the histograms for each
+%of those features.
 
 \subsection{Artificial Neural Network with Keras}
 
@@ -249,7 +269,6 @@ It then fits a forward-selection procedure on the basis of a ridge regression \c
 important features, weighted by the distance calculated earlier.
 Following \cite{ribeiroWhyShouldTrust2016a}, the linear regression coefficients ("weights") are then reported as a locally accurate approximation of feature importance.
 This method hence enables to go beyond the typical "black-box" description of a neural network.
-
 While this chapter described the implemented methods theoretically, the remainder of this paper reports and interprets the results of those 
 machine learning techniques applied on the cross-sell data set.
 
@@ -445,6 +464,21 @@ However, more research would be necessary to establish a clear causal relationsh
 A neural network is definitely not the method of choice for this task---even though new developments such as LIME can greatly expand the trust and explainability of black-box models.
 
 \section{Conclusion}
+
+The first goal of this paper was to predict whether a bank customer opens another checking account based on their individual characteristics.
+A sophisticated hyperparameter-tuned Artificial Neural Network was therefore introduced and its predictions compared to a simple logit model.
+Surprisingly, the ANN performed slightly worse than the benchmark logit model in terms of accuracy and only marginally outperformed it in terms of AUC.
+Due to the enormous computational resources required for finding this optimal ANN, this paper argues against the implementation of neural networks
+for predicting cross-sell in this particular business setting and for simpler methods such as a logit model.
+
+The second research question to identify underlying characteristics that drive cross-selling was initially impossible to answer with a black-box ANN.
+However, this paper implemented a local approximation of the neural network with LIME by an easily interpretable regression model.
+This enabled detailed insights into which customer features support or prevent cross-selling on an individual customer level.
+Most importantly, sending mail about opening a new account is the most important feature for the four analyzed customers, followed directly by the customer's age.
+Younger clients are more likely to cross-buy, which is also supported on the global level by looking at correlations and individual scatter plots.
+Even though those two methods mostly answer the research question, there is still more research to be done to establish causality.
+On a global level, the methodology implemented in this study only gives a shows which features are associated with cross-selling.
+However, no reasonable statement can be made about which features \textit{cause} an increased cross-selling probability across all customers.
 
 
 
