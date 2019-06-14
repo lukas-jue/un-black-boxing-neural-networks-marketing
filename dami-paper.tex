@@ -68,7 +68,7 @@
 %  {\Large{\bf Predicting Cross-Sell with Artificial Neural Networks}} \newline
 %  {\Large{An Empirical Study of ING's Customer Data}} \vspace{0.5cm}
 {\Large{\bf Un-Black-Boxing Artificial Neural Networks}} \newline
-{\Large{Explaining Cross-Sell Predictions with Bank Customer Data}} \vspace{0.5cm}
+{\large{Predicting and Explaining Bank Customer's Cross-Sell Likelihood}} \vspace{0.5cm}
 
 
   Seminar Thesis \\\vspace{2cm}
@@ -121,7 +121,7 @@ are likely open a checking account in the future
 
 \section{Methodology}
 This section provides an overview over the implemented methodology by first outlining the feature engineering process that transforms the original data set
-as required by neural networks.
+to be in the appropirate format for neural networks.
 The second part then describes the artificial neural network and its initial architecture, while the third part describes the hyperparameter tuning process
 that leads to the \textit{best} model\footnote{This model is definitely not the best model \textit{existing}, but the best model \textit{found} through the trial-and-error tuning process described in detail in section \ref{sec_crossval}.}.
 Lastly, this section addresses a common criticism of machine learning technologies in general and neural networks in particular---the 
@@ -136,19 +136,21 @@ bias the prediction.
 Deleting all observations with missing values would do exactly that.
 Hence, I impute missing values with a Random Forest from the \pkg{randomForest}\code{::rfImpute()} function.
 This algorithm first replaces missing numeric (factor) variables with the median (mode) and then uses proximity measures from \code{randomForest}
-as weights to replace \code{NA's} with the weighted average (the value with the highest proximity) of the non-missing values and repeats this for a
-pre-defined number of iterations\footnote{After four iterations the out-of-bag error did not decrease visibly anymore, hence four iterations were chosen}
+as weights to replace \code{NA's} with the weighted average of the non-missing values and repeats this for a
+pre-defined number of iterations\footnote{After four iterations the out-of-bag error did not decrease notably anymore, hence four iterations were chosen.}
  \citep{liawClassificationRegressionRandomForest2002}.
 I furthermore bin the continuous features \code{age}, \code{entry\_age} and \code{last\_acc}\footnote{Those three features exhibit a highly
 non-linear relationship. According to the universal approximation theorem, a 
 neural network with enough units in a hidden layer can approximate any continuous function \citep{hornikApproximationCapabilitiesMultilayer1991}.
-Since the best neural network will be found by trying out different hyperparameters, including some which would not be "enough" hidden layer units, I bin
+Since the best neural network will be found by trying out different hyperparameters, including some combinations which would not include \textit{enough}
+hidden layer units for a solid approximation, I bin
 those two variables to make sure that this non-linear relationship can be taken into account by the model in any case. Also, the benchmark logit model
-could not capture this effect without further specification.}.
+could not capture this effect without further specification.}
+in four distinct groups.
 Since a neural network cannot handle multi-categorical features, the routine dummy-codes those.
 Finally---to not distort the input weights for the first hidden layer and thus not negatively affect the prediction quality 
 \citep[pp. 398]{hastieElementsStatisticalLearning2017}---I center and scale all input features to exhibit $\bar{x}=0$ and $s=1$.
-The feature engineered data set consists of $N=72$ input variables that will be used to predict cross-sell. 
+The feature engineered data set consists of $n_x = 74$ input variables that will be used to predict cross-sell. 
 \begin{figure}[ht]
 	\centering
   \includegraphics[scale=0.63]{figures/hist_all_features.pdf}
@@ -160,15 +162,15 @@ of those features.
 \subsection{Artificial Neural Network with Keras}
 
 While the previous section discussed the steps required to transform the data to a suitable format for an ANN,
-this section will describe the basic architecture of this classification method.
+this part describes the basic architecture of this classification method.
 This study uses the \proglang{R} interface \pkg{keras} \citep{cholletInterfaceKeras2017} to the popular same name \proglang{Python} library.
-This high-level API enables an easier way to access the features of Google's \pkg{TensorFlow} \citep{abadiTensorFlowLargeScaleMachine2015}.
+As a high-level API, it enables an easier way to access the features of Google's \pkg{TensorFlow} \citep{abadiTensorFlowLargeScaleMachine2015}.
 
 The neural network in this study is a common feedforward network which uses the backpropagation algorithm to adjust its weights \citep{werbosBackpropagationTimeWhat1990}.
-Based on the feature engineering process described in the previous chapter, the ANN has $n_x = 74$ inputs $X_i$, 
+Based on the feature engineering process described in the previous section, the ANN has $n_x = 74$ inputs $X_i$, 
 two hidden layers with neurons $H_i^l$ referring to the $i^{th}$ neuron in the $l^{th}$ hidden layer. 
 The number of neurons in the hidden layers is subject to hyperparameter tuning in the following section.
-As a final layer, the ANN predicts the single output $\hat{Y}_i$, in our case \code{xsell}.
+As a final layer, the ANN predicts the single binary output $\hat{Y}_i$, in our case \code{xsell}.
 Figure \ref{fig_nn_arch} graphically visualizes the architecture.
 \input{figures/nnet_architecture.tex} \label{fig_nn_arch}
 This network uses a random uniform distribution $U(-0.05, 0.05)$ to initialize the weights for each neuron $H_i^l$.
@@ -179,19 +181,19 @@ This process randomly drops units from the ANN and thus leads to a more generali
 Mitigating the risk of overfitting to the training data is also one key objective of the next section.
 
 \subsection{Cross-validation and Hyperparameter Tuning} \label{sec_crossval}
-After setting up the basic architecture of the neural net, this section describes the process that leads to the \textit{best} model\footnote{as mentioned earlier, this is not the best model \textit{existing}, but \textit{found}.}.
+After setting up the basic architecture of the neural network, this section describes the process that leads to the \textit{best} model\footnote{as mentioned earlier, this is not the best model \textit{existing}, but \textit{found}.}.
 An important feature of the \textit{best} model is that it does not memorize the exact relationships in the training data set---overfitting---but
-rather learns the generalizable underlying mechanisms an thereby performs well on the holdout validation data set. 
-For this purpose I first describe the optimization of the ANN through cross-validating predictions of several training epochs on a holdout 
-sample and then introduce hyperparameter tuning---a process that leads to the most desirable configuration of the ANN by
+rather learns the generalizable underlying mechanisms an thereby performs well on the holdout validation and subsequently on the test or even an out-of-time data set. 
+For this purpose I first describe the optimization of the ANN by cross-validating predictions of several training epochs with a holdout 
+sample and then introduce hyperparameter tuning---a process that leads to the most desirable\footnote{"Desirable" is defined as most accurate in this study. However, other metrics such as loss are also valid optimization criteria.} configuration of the ANN by
 running many combinations of model specifications.
 
-To compile the ANN, I use the adaptive moment estimation algorithm \code{Adam} \citep{kingmaAdamMethodStochastic2014}
-which is recommended as the go-to gradient descent optimizer \citep{ruderOverviewGradientDescent2016}.
+To compile the ANN, I use the adaptive moment estimation algorithm \code{Adam} \citep{kingmaAdamMethodStochastic2014}.
+\cite{ruderOverviewGradientDescent2016} recommend this gradient descent optimizer as computationally inexpensive and performing best in most applications.
 This optimizer minimizes the cross-entropy loss \citep{zhangGeneralizedCrossEntropy2018} for each training epoch and accordingly updates the weights
 for the next model.
-Figure \ref{fig_history} shows the training history of the chosen ANN over ten epochs and the cross-entropy loss in the top pane, and the accuracy
-in the bottom part, each for the training and validation data set.
+Figure \ref{fig_history} shows the training history of the chosen ANN over ten epochs. The cross-entropy loss is plotted in the top pane, and the accuracy
+displayed in the bottom part, each for the training and validation data set.
 
 \begin{figure}[ht]
 	\centering
@@ -203,14 +205,14 @@ The validation accuracy in comparison with the training accuracy in this case in
 and true negatives in both data sets, but more importantly, gives an indication whether overfitting is an issue.
 If the training accuracy kept steadily increasing, while the validation accuracy kept relatively constant, the model would overfit---which means
 that the model is not generalizable beyond the training data set \citep{hansenNeuralNetworkEnsembles1990}.
-As exhibited in figure \ref{fig_history}, both accuracies are relatively constant and equal during the last training epochs.
-This is a strong indication that the model does not overfit and will perform similarly on the test or out-of-time data.
+As exhibited in figure \ref{fig_history}, both accuracies are relatively constant and rather similar during the last training epochs.
+This is a strong indication that the model does not overfit and will perform similarly well on the test or out-of-time data.
 
 However, one question remains unanswered with cross-validation: Which model architecture leads to the most accurate predictions?
 Hyperparameter tuning provides a remedy to this issue \citep{bergstraRandomSearchHyperparameter2012}.
-In short, this process runs numerous models with combinations of hyperparameters\footnote{Hyperparameters refer to the specifications of an ANN,
+In short, this process runs numerous models with different combinations of hyperparameters\footnote{Hyperparameters refer to the specifications of an ANN,
 such as number of units per hidden layer, dropout rate and weights, but also different optimization algorithms and activation functions \citep{bengioGradientbasedOptimizationHyperparameters2000}}. 
-The model with the highest \code{val\_acc} is then chosen to be the \textit{best} model for prediction of \code{xsell}.
+The model with the highest \code{val\_acc} is then chosen to be the \textit{best} model for predicting \code{xsell}.
 This study uses the "naive" grid method, which runs all possible combinations of pre-defined values for hyperparameters\footnote{I use each three different values of the hyperparameters \code{val\_acc}, \code{acc}, \code{units1}, \code{dropout1}, \code{units2}, \code{dropout2}, \code{epochs} and \code{batch}}.
 However, this method is computationally expensive.
 It requires $N=a^b$ different models, where $a$ is the number of discrete values for each parameter and $b$ is the 
@@ -222,14 +224,14 @@ A possible solution to this problem is random search, which is even more efficie
 
 By cross-validating the predictions with a loss function and by tuning the ANN's hyperparameter, 
 this section described the approach to finding the most suitable model for the prediction task at hand.
-The next part turns to prediction explanation---a key discussion point and critique of neural networks
+The next part turns to prediction explanation---a key discussion point and critique of neural networks.
 
 \subsection{Local Interpretable Model-agnostic Explanation (LIME)} \label{sec_lime_theory}
 In contrast to traditional regression-based methods that yield beta-coefficients and enable the construction of a functional form of 
 the underlying mechanisms in the data, a neural network does not provide an easily interpretable function that links $Y_i$ to $X_i$.
 A common criticism of ANN hence is the "black-box"-argument \citep{benitezAreArtificialNeural1997, dayhoffArtificialNeuralNetworks2001}.
 Though the model might yield more accurate predictions, there is no clear answer to the question why the model predicted those particular values
-or which features contributed by how much to that.
+or which features contributed by how much.
 
 With the development of new methods that address this problem, an ANN is less a black box.
 Consistent with the research question to uncover factors that drive cross-sell, 
@@ -247,11 +249,12 @@ It then fits a forward-selection procedure on the basis of a ridge regression \c
 important features, weighted by the distance calculated earlier.
 Following \cite{ribeiroWhyShouldTrust2016a}, the linear regression coefficients ("weights") are then reported as a locally accurate approximation of feature importance.
 This method hence enables to go beyond the typical "black-box" description of a neural network.
+
 While this chapter described the implemented methods theoretically, the remainder of this paper reports and interprets the results of those 
 machine learning techniques applied on the cross-sell data set.
 
 \section{Results and Model Comparison}
-This section proceeds as follows: First, it reports the results of the hyperparameter tuning and cross-validation and the resulting optimal ANN architecture.
+This section proceeds as follows: First, it reports the results of the hyperparameter tuning and cross-validation as well as the resulting optimal ANN architecture.
 The second part then compares the predictions of the described neural network to a simple benchmark logit model.
 It concludes by reporting the feature importance for individual customers derived by LIME.
 
@@ -283,22 +286,21 @@ Also, the dropout rate for all best performing models is $0.6$ for both hidden l
 for both layers between input and output.
 In contrast to that the least preferable models exhibit only $32$ neurons in the second hidden layer.
 In this case, a higher number of neurons in those layers appears to better capture the effects of the input features on \code{xsell}.
-The winning model used ten training epochs, that means the model ran ten times before stopping.
+The winning model used ten training epochs, that means the model adjusted weights by backpropagation ten times before stopping.
 This value is rather low\footnote{I tested epoch values of 5, 10, and 30 for the tuning routine.} and suggests an advantage of stopping early to avoid overfitting. 
-Finally, the size of the batches---that is the number of samples sent back and forth through the network at once\citep{cholletInterfaceKeras2017}---apppears to not have an obvious impact
+Finally, the size of the batches---that is the number of samples sent back and forth through the network at once \citep{cholletInterfaceKeras2017}---apppears to not have an obvious impact
 on model performance. 
 
-
 Even though this routine identified the best out of 324 models, it only tested three different values for eight hyperparameters in two seperate runs.
-Due to the computational complexity, important parameters such as the $learning rate$ was not included.
-Furthermore, I only tested three more or less arbitrarily chosen discrete values for the included model characteristics---it is therefore obvious that
+Due to the computational complexity, important parameters such as the $learning\ rate$ were not included.
+Furthermore, I only tested three more or less arbitrarily chosen discrete values for the hyperparameters---it is therefore obvious that
 better models do exist. It is however difficult to identify them with the grid method and limited computational resources.
 
 \subsection{Comparing the Predicions of the ANN with the Benchmark Logit Model}
 
 The ANN from the previous section with the highest validation accuracy is furthermore applied to the remaining unseen test data\footnote{20\% 
 of the 10,000 observations in the data set were used for testing, while the remaining 8,000 observations form the training set. Out of those, I reserved
-2,400 rows (30\%) as a holdout validation sample for cross-validation during the fitting process}.
+2,400 rows (30\%) as a holdout validation sample for cross-validation during the fitting process.}.
 To assess the quality of the model, this paper now compares the resulting model statistics and confusion matrices of the discussed ANN with those of a 
 simple logit model based on the same 74 input features in the neural network\footnote{In fact, this logit model has a relatively simple functional form, 
 since it throws in every feature at hand without any selection mechanism or concern for multicolllinearity.
@@ -309,7 +311,7 @@ To a surprise, there is no apparent difference in model accuracy between the hyp
 The reference model even predicts \code{xsell} 0.4 percentage points more accurate\footnote{Due to the small test set sample size of 2,000 this 
 effect might not be statistically significant.}.
 Since 50\% of all customers in the data set made a purchase, this is the benchmark accuracy for any predictive model.
-Both the ANN and logit model in this case yield a roughly 29\% increase in accuracy compared to a coin toss.
+Compared to a coin toss, both the ANN and logit model yield a roughly 29\% increase in accuracy.
 %Comparison of Model Statistics
 \begin{table}[!htbp] \centering
 \caption{Model performance comparison---statistics and confusion matrix}
@@ -341,7 +343,7 @@ The ANN is relatively better at predicting customers that actually buy another p
 while the logit model more accurately predicts negative outcomes.
 This has far-reaching implications for business applications, which are further elaborated on in chapter~\ref{sec_man_impl}.
 
-Another widely used visual tool and metric for model comparison in machine learning is the receiver operating characteristics curve (ROC) and the associated
+Another widely used visual tool and metric for model comparison in machine learning is the receiver operating characteristics (ROC) curve and the associated
 area under curve (AUC) \citep{fawcettIntroductionROCAnalysis2006}.
 Figure \ref{fig_roc} plots both ROC curves and the AUC in a single plot---the curves are visually inspected almost identical.
 Quantified by the AUC, the ANN performs 0.9 percentage points better than the logit model at 69.3\%.
@@ -349,7 +351,7 @@ Quantified by the AUC, the ANN performs 0.9 percentage points better than the lo
 \begin{figure}[ht]
 	\centering
   \includegraphics[scale=0.63]{figures/roc_auc_comp.pdf}
-	\caption{ROC curve comparison between benchmark logit and hyperparameter-tuned neural network predictions}
+	\caption{ROC curve comparison between benchmark logit (black) and hyperparameter-tuned neural network predictions (red)}
 	\label{fig_roc}
 \end{figure}
 
@@ -357,14 +359,14 @@ Quantified by the AUC, the ANN performs 0.9 percentage points better than the lo
 \subsection{Beyond the Black Box: Feature Importance with LIME}
 The previous section introduced the implemented ANN model specification and reported the results in terms of predictive performance.
 However, prediction is only one part of the research question.
-The other---equally important question to address---is explainability.
+The other---equally important question to address is explainability.
 Out-of the box, machine learning algorithms such as ANN are indeed a "black-box" and thus it is hard to understand why the model predicted which outcomes.
 LIME, as introduced theoretically in section \ref{sec_lime_theory}, provides insights into the reasoning of why the model came to a certain
-conclusion by locally fitting an explainable model and reporting the resulting feature weights as a measure for its importance to the prediction.
+conclusion by locally fitting an explainable model and reporting the resulting feature weights as a measure for its importance to the prediction \citep{ribeiroWhyShouldTrust2016a}.
 In this paper, I focus on explanations for individual observations, i.e. individual customers.
 A focus on explaining feature importance on a global level would be the next step.
 However, the limited scope of this paper does not permit a thorough discussion of both.
-I believe that in a business setting, it is crucial to understand why the model predicted a certain outcome for cross selling of an individual customer.
+In a business setting, it is crucial to understand why the model predicted a certain outcome for cross selling of an individual customer, especially for building human trust in the machine learning algorithm's prediction \citep{ribeiroWhyShouldTrust2016a}.
 The remainder of this section therefore focuses on this explanation only.
 
 \begin{figure}[ht]
@@ -382,7 +384,7 @@ It is apparent that the features that exhibit the highest correlation with \code
 (see figure \ref{fig_corr} in the appendix for a graphical representation of correlation in the data set). 
 
 A red bar indicates that the particular value of this feature in this case contradicts the model's conclusion,
-while a green bar shows supporting contributions to the model's prediction.
+while a green bar shows supporting evidence to the model's prediction.
 Whether the customer received an advertisement mail about opening a checking account (\code{giro\_mailing\_X1}) shows the largest weight from the regression model in every one of the four cases.
 Also the group with the lowest days passed since the customer last opened an account (\code{last\_acc\_bin1}) show a very large contribution to the 
 prediction in those four cases.
@@ -393,13 +395,12 @@ A first step towards a general statement about characteristics of the customer b
 opened a checking account or not.
 For \code{age}, the violin plot in figure \ref{fig_violin_age} shows a striking difference in the age distribution.
 Younger customers tend to more often cross-buy.
-Looking at the correlation of all features with \code{xsell} in figure \ref{fig_corr} in the Appendix, the youngest age group shows the highest positive correlation after \code{giro\_mailing\_X1}.
-Receiving a mail with an offer to buy another product in every of the four individual explanations the leading feature that has the highest influence on
+Looking at the correlation of all features with \code{xsell} in figure \ref{fig_corr} in the appendix, the youngest age group shows the highest positive correlation after \code{giro\_mailing\_X1}.
+Receiving a mail with an offer to buy another product in every of the four individual explanations is the leading feature that has the highest influence on
 the model's prediction, while it also displays the highest correlation with cross-sell.
 On the contradicting side, a missing preferred device displays the highest negative correlation,
 while it also comes up as the third most important feature in the individual LIME explanations.
-However, this assessment is only descriptive in nature without any underlying statistical modeling.
-Though a mere correlation does not imply causality, they can provide a first clue about general underlying mechanism and can validate the LIME results.
+Though a mere correlation does not imply causality, it can provide a first clue about general underlying mechanism and can validate the LIME results.
 Judging from the first four customers only, the locally fitted models' weights are proportional to the overall correlations.
 
 Combining the LIME explanations with the actual values for those customers would now enable to act on those results.
@@ -414,13 +415,13 @@ The following section further elaborate on this issue and discusses the manageri
 
 \section{Managerial and Research Implications} \label{sec_man_impl}
 This section first highlights managerial implications that can be derived from this study and then outlines future research areas in this field.
-Looking at the accuracy of the ANN compared to a simple benchmark logit model one recommendation for practice is obvious:
+Looking at the ANN's accuracy compared to a simple benchmark logit model one recommendation for practice is obvious:
 Do not use neural networks in this particular business setting.
 They are computationally expensive and provide no overall predictive advantage to way simpler models such as logit.
-Possible reasons for the disappointing ANN performance could be the lack of enough data---neural networks require large data sets accurately learning
-the underlying relationships.
+Possible reasons for the disappointing ANN performance could be the lack of enough data---neural networks require larger data sets compared
+to well-specified simple regression-based models for accurately learning the underlying relationships \cite{chanClassifierDesignComputeraided1999}.
 Also, neural networks are better suited for other more complex tasks such as image recognition \citep{estevaDermatologistlevelClassificationSkin2017} and speech \citep{hintonDeepNeuralNetworks2012} or text recognition \citep{jaderbergSyntheticDataArtificial2014}.
-In that case, the performance difference to simple regression based methods is extraordinary and has led to a widespread adoption of ANNs in practice.
+In those cases, a simple multivariate regression would not be suitable.
 
 Nevertheless, LIME  provides an important way to understand why the black-box ANN predicted cross-selling.
 This is important to first get an understanding which features are contributing by how much and in which direction.
@@ -429,15 +430,15 @@ More importantly however, LIME builds trust in the prediction of an otherwise my
 By fitting a locally faithful and interpretable model, this new approach enables decision makers to assess the validity of the neural network's 
 predictions beyond typical performance measures such as accuracy and AUC \citep{ribeiroWhyShouldTrust2016a}.
 
-Still, this paper lacks a generalizeable explanation beyond simple descriptive metrics such as correlation (see figure \ref{fig_corr}) or distributions of observations by \code{xsell} as shown in figure \ref{fig_violin_age}.
+Still, this paper lacks a generalizeable explanation beyond simple descriptive metrics such as correlation (see figure \ref{fig_corr}) or the distribution of observations by \code{xsell} as shown in figure \ref{fig_violin_age}.
 Though individual predictions can be explained by LIME, one cannot derive a truly general statement about the sample from it.
 In their research on LIME, \cite{ribeiroWhyShouldTrust2016a} suggest submodular picking of individual observation-level explanations in order to 
 derive generalizable insights into the black-box model.
 Simplified, they propose an algorithm that optimally picks the most representative individual observations for the entire sample.
 Unfortunately, the LIME-SP routine is so far only implemented in the original \proglang{Python} package and currently under development for the corresponding  \pkg{keras} \proglang{R} interface \citep{kavickyLocalInterpretableModelAgnostic2017}. 
 
-This empirical analysis suggests hints which customer groups are most likely to purchase another product.
-Most importantly, young customers tend to purchase more likely than old ones. The more recently a customer already cross-bought,
+This empirical analysis suggests hints at which customer groups are likely to purchase another product.
+Most importantly, young customers exhibit a higher probability to purchase than old ones. The more recently a customer already cross-bought,
 the more likely it is that the bank can sell an additional product to this client again.
 Targeting those customer groups in particular could be a valid business strategy.
 However, more research would be necessary to establish a clear causal relationship between those variables.
@@ -459,10 +460,10 @@ A neural network is definitely not the method of choice for this task---even tho
 \end{figure}
 
 \section{R Source Code}
-\input{code/lst_main.tex}
-\input{code/lst_tuning.tex}
-\input{code/lst_architecture.tex}
-\input{code/lst_oot.tex}
+%\input{code/lst_main.tex}
+%\input{code/lst_tuning.tex}
+%\input{code/lst_architecture.tex}
+%\input{code/lst_oot.tex}
 
 \clearpage
 \bibliography{library}
