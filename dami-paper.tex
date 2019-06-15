@@ -15,6 +15,7 @@
 \usepackage{amsmath}
 \usepackage{verbatim}
 \usepackage{epstopdf} % to include eps files
+\usepackage{enumitem} % for the abbreviations table
 
 
 \usepackage[usenames,dvipsnames]{color}     %for R colors and formatting
@@ -35,6 +36,8 @@
 \newcommand{\pkg}[1]{{\normalfont\fontseries{b}\selectfont #1}}
 \let\proglang=\textsf
 \let\code=\texttt
+
+\pgfplotsset{compat=1.16} % for backward compatibility of pgfplots package
 
 \lstset{ %for R colors and formatting
   language=R,                     % the language of the code
@@ -101,6 +104,24 @@
 \listoffigures
 \listoftables
 \newpage
+\newlist{abbrv}{itemize}{1}
+\setlist[abbrv,1]{label=,labelwidth=1in,align=parleft,itemsep=0.1\baselineskip,leftmargin=!}
+ 
+\section*{List of Abbreviations}
+%\chaptermark{List of Abbreviations}
+ 
+\begin{abbrv}
+ 
+\item[ANN]			Artificial Neural Network
+\item[API]				Application Programming Interface
+\item[AUC]			Area Under Curve
+\item[LIME]			Local Interpretable Model-agnostic Explanation
+\item[ReLU]			Rectified Linear Unit
+\item[ROC]			Receiver Operating Characteristics
+\item[SP]				Submodular Pick
+ 
+\end{abbrv}
+\newpage
 \setcounter{page}{2}
 \pagenumbering{arabic}
 \setlength{\baselineskip}{1.5\baselineskip}
@@ -110,7 +131,7 @@
 \section{Introduction}
 
 The rise of machine learning techniques has come with a great increase
-of predictive accuracy in many settings \citep{jordanMachineLearningTrends2015}. The hype around those techniques has led to a widespread use of them in all kinds of fields in science and practice---from medicine to business or self-driving cars \citep{chenMachineLearningPrediction2017}.
+of predictive accuracy in many settings \citep{jordanMachineLearningTrends2015}. The hype around those techniques has led to a widespread use of them in many fields in science and practice---from medicine to business or self-driving cars \citep{chenMachineLearningPrediction2017}.
 However, some of those methods are increasingly computationally expensive and might not in every case be superior to traditional regression-based methods such as a simple multivariate linear regression or logit models.
 
 This paper uses a data set from a large German bank with numerous customer characteristics to predict whether a customer buys another
@@ -119,7 +140,6 @@ The goal of this research is first to predict weather a customer will cross-buy 
 Therefore, this paper introduces a complex ANN with optimized predictive power and compares the predictions to a simple logit model.
 One downside of ANN models in particular the lack of interpretability---they are widely regarded as black-boxes \citep{benitezAreArtificialNeural1997, dayhoffArtificialNeuralNetworks2001}.
 This paper addresses this shortcoming by implementing LIME---a method to explain individual predictions of neural networks \citep{ribeiroWhyShouldTrust2016a}.
-
 The paper is structured as follows: The first chapter gives a short introduction to cross-selling theory and is followed by the explanation of the implemented statistical methods.
 The subsequent chapter presents the empirical results and especially compares the ANN to the simple logit model.
 The paper concludes with implications for practitioners and outlines further research avenues.
@@ -127,21 +147,21 @@ The paper concludes with implications for practitioners and outlines further res
 \section{A Short Primer on Cross-Sell}
 Cross-selling is an important action field for established companies with an existing customer base.
 Selling additional products to present customers taps into a readily accessible target group for additional sales potential.
-cite{felveyCrosssellingComputer1982} argues that a businesses' client base might already be more inclined to buy another product from the company that they already have a relationship with, compared to non-customers.
+\cite{felveyCrosssellingComputer1982} argues that a businesses' client base might already be more inclined to buy another product from the company that they already have a relationship with, compared to non-customers.
 Also, the cost of selling additional products to already existing customers is cheaper than targeting new ones \citep{reichheldZeroDefectionsQuality1990}.
 Benefits of cross-selling from the company point-of-view include increased switching costs for customers, while customers benefit from an easy integration
 of different products and a higher certainty about the quality of the new product \citep{kamakuraApplyingLatentTrait1991, kamakuraCrosssellingDatabaseMarketing2003}. 
 However, as in most business settings, there is no free lunch and hence cross-selling efforts are also associated with costs and risks.
 Apart from trivial costs for cross-selling efforts such as mailing or telephone campaigns, there is a significant churn risk involved.
 If not accurately targeted, customers can be annoyed by irrelevant and continuous advertisement and might eventually churn as a result \citep{keaveneyCustomerSwitchingBehavior1995}.
-Due to the significant sales potential on the one hand and costs and risks involved on the other hand, it is therefore paramount to identify the target group that is most likely to cross-buy another product.
+Due to the significant sales potential on the one hand and costs and risks involved on the other hand, it is therefore paramount to accurately identify the target group that is most likely to cross-buy another product.
 This paper addresses this issue and presents an Artificial Neural Network to accomplish that task in a most accurate way.
 
 
 \section{Methodology}
 This section provides an overview over the implemented methodology by first outlining the feature engineering process that transforms the original data set
-to be in the appropirate format for neural networks.
-The second part then describes the artificial neural network and its initial architecture, while the third part describes the hyperparameter tuning process
+to be in the appropriate format for neural networks.
+The second part then describes the ANN and its initial architecture, while the third part describes the hyperparameter tuning process
 that leads to the \textit{best} model\footnote{This model is definitely not the best model \textit{existing}, but the best model \textit{found} through the trial-and-error tuning process described in detail in section \ref{sec_crossval}.}.
 Lastly, this section addresses a common criticism of machine learning technologies in general and neural networks in particular---the 
 uninterpretable black box---by introducing the Local Interpretable Model-agnostic Explanation (LIME) as a method to 
@@ -150,7 +170,7 @@ uninterpretable black box---by introducing the Local Interpretable Model-agnosti
 \subsection{Feature Engineering and Data Set Preparation}
 In order to feed seamlessly into a neural network, extensive feature engineering and data preparation is required \citep{hastieElementsStatisticalLearning2017}.
 Before training the model, I replace missing values in \code{pref\_device} and \code{occupation} by \code{None\_or\_missing}, transform all \code{char} variables to a \code{factor} type, and remove the misleading feature \code{ID}.
-However, there are still numerous features including missing values. Since they are not missing at random, they need to be dealt with in order to not
+However, there are still numerous features including missing values. Since they are not missing at random, they need to be imputed in order to not
 bias the prediction.
 Deleting all observations with missing values would do exactly that.
 Hence, I impute missing values with a Random Forest from the \pkg{randomForest}\code{::rfImpute()} function.
@@ -195,9 +215,9 @@ Figure \ref{fig_nn_arch} graphically visualizes the architecture.
 \input{figures/nnet_architecture.tex} \label{fig_nn_arch}
 This network uses a random uniform distribution $U(-0.05, 0.05)$ to initialize the weights for each neuron $H_i^l$.
 Also, a bias initialized at zero feeds into the two hidden layers, for which each $H_i^l$ is activated by a rectifier function (\code{ReLU}).
-\cite{glorotDeepSparseRectifier2011} show that rectifying units in an ANN yield superior outcomes compared to others such as the hyperbolic tangent activation function. Since the output $\hat{Y}_i$ is a binary feature in this case, I use a sigmoid activation function for the output layer.
+\cite{glorotDeepSparseRectifier2011} show that rectifying units in an ANN yield superior outcomes compared to others such as the hyperbolic tangent activation function. Since the output $\hat{Y}_i$ is a binary feature, I use a sigmoid activation function for the output layer.
 To avoid overfitting, the model implements dropout for the hidden layers.
-This process randomly drops units from the ANN and thus leads to a more generalizable model \citep{srivastavaDropoutSimpleWay2014}.
+This process randomly drops neurons and their connections from the ANN and thus leads to a more generalizable model \citep{srivastavaDropoutSimpleWay2014}.
 Mitigating the risk of overfitting to the training data is also one key objective of the next section.
 
 \subsection{Cross-validation and Hyperparameter Tuning} \label{sec_crossval}
@@ -237,7 +257,7 @@ This study uses the "naive" grid method, which runs all possible combinations of
 However, this method is computationally expensive.
 It requires $N=a^b$ different models, where $a$ is the number of discrete values for each parameter and $b$ is the 
 number of hyperparameters to be tuned.
-Running two separate sets of hyperparameter combinations for 324 different models took roughly five hours on a standard consumer laptop.
+Running two separate sets of hyperparameter combinations for 324 different models in total took roughly five hours on a standard consumer laptop.
 It can be assumed that this limited set of combinations did by far not yield the best model.
 However, this naive grid method needs an exponentially increasing number of different models and thus gets difficult to handle quite quickly.
 A possible solution to this problem is random search, which is even more efficient than grid search \citep{bergstraRandomSearchHyperparameter2012}.
@@ -301,7 +321,7 @@ $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & $\dots$ & 
 \end{tabular} 
 \end{table} 
 It is noteworthy that this evaluation metric only varies by five percentage points from the best ($65.6\%$) to the worst model ($60.2\%$).
-Also, the dropout rate for all best performing models is $0.6$ for both hidden layers, while the number of units in those varies between $64$ and $128$ 
+Also, the dropout rate for all five best performing models is $0.6$ for both hidden layers, while the number of units in those varies between $64$ and $128$ 
 for both layers between input and output.
 In contrast to that the least preferable models exhibit only $32$ neurons in the second hidden layer.
 In this case, a higher number of neurons in those layers appears to better capture the effects of the input features on \code{xsell}.
@@ -317,7 +337,7 @@ better models do exist. It is however difficult to identify them with the grid m
 
 \subsection{Comparing the Predicions of the ANN with the Benchmark Logit Model}
 
-The ANN from the previous section with the highest validation accuracy is furthermore applied to the remaining unseen test data\footnote{20\% 
+The ANN from the previous section with the highest validation accuracy is furthermore used to predict \code{xsell} in the remaining unseen test data set\footnote{20\% 
 of the 10,000 observations in the data set were used for testing, while the remaining 8,000 observations form the training set. Out of those, I reserved
 2,400 rows (30\%) as a holdout validation sample for cross-validation during the fitting process.}.
 To assess the quality of the model, this paper now compares the resulting model statistics and confusion matrices of the discussed ANN with those of a 
@@ -326,7 +346,7 @@ since it throws in every feature at hand without any selection mechanism or conc
 However, those features have undergone the same extensive feature engineering process as described for the ANN.
 Hence, a lot of concerns are dealt with, e.g. though not functionally mapped, the logit model incorporates non-linear effects of \code{age} through binning.}.
 Table \ref{tab_comparemodel} displays all relevant model performance metrics from accuracy to kappa and each confusion matrix.
-To a surprise, there is no apparent difference in model accuracy between the hyperparameter tuned ANN and the simple benchmark logit model.
+To a surprise, there is no apparent difference in model accuracy between the hyperparameter-tuned ANN and the simple benchmark logit model.
 The reference model even predicts \code{xsell} 0.4 percentage points more accurate\footnote{Due to the small test set sample size of 2,000 this 
 effect might not be statistically significant.}.
 Since 50\% of all customers in the data set made a purchase, this is the benchmark accuracy for any predictive model.
@@ -360,7 +380,7 @@ Nevertheless, both models produce structurally different predictions.
 This becomes clear when comparing sensitivity (true positive rate) and specificity (true negative rate).
 The ANN is relatively better at predicting customers that actually buy another product (\code{xsell = 1}),
 while the logit model more accurately predicts negative outcomes.
-This has far-reaching implications for business applications, which are further elaborated on in chapter~\ref{sec_man_impl}.
+This has far-reaching implications for business applications, since certain wrong predictions might be more costly than others\footnote{The scope of this paper does unfortunately not allow a thorough discussion of different predictive error costs. See \cite{domingosMetaCostGeneralMethod1999} for a detailed discussion on this topic and a proposed solution that incorporates costs into any classifier.}.
 
 Another widely used visual tool and metric for model comparison in machine learning is the receiver operating characteristics (ROC) curve and the associated
 area under curve (AUC) \citep{fawcettIntroductionROCAnalysis2006}.
@@ -378,12 +398,12 @@ Quantified by the AUC, the ANN performs 0.9 percentage points better than the lo
 \subsection{Beyond the Black Box: Feature Importance with LIME}
 The previous section introduced the implemented ANN model specification and reported the results in terms of predictive performance.
 However, prediction is only one part of the research question.
-The other---equally important question to address is explainability.
-Out-of the box, machine learning algorithms such as ANN are indeed a "black-box" and thus it is hard to understand why the model predicted which outcomes.
+The other equally important question to address is explainability.
+Out-of-the-box, machine learning algorithms such as ANN are indeed a "black-box" and thus it is impossible to understand why the model predicted which outcomes.
 LIME, as introduced theoretically in section \ref{sec_lime_theory}, provides insights into the reasoning of why the model came to a certain
 conclusion by locally fitting an explainable model and reporting the resulting feature weights as a measure for its importance to the prediction \citep{ribeiroWhyShouldTrust2016a}.
 In this paper, I focus on explanations for individual observations, i.e. individual customers.
-A focus on explaining feature importance on a global level would be the next step.
+Explaining feature importance on a global level would be the next step.
 However, the limited scope of this paper does not permit a thorough discussion of both.
 In a business setting, it is crucial to understand why the model predicted a certain outcome for cross selling of an individual customer, especially for building human trust in the machine learning algorithm's prediction \citep{ribeiroWhyShouldTrust2016a}.
 The remainder of this section therefore focuses on this explanation only.
@@ -397,20 +417,20 @@ The remainder of this section therefore focuses on this explanation only.
 
 Figure \ref{fig_lime_four} visualizes the results of \pkg{lime}\code{::explain()} for the first four customers in the test data set.
 For each of those customers, the ten most important features are reported in descending order of their influence on the model's prediction.
-$Label$ is the model's prediction whether a customer buys another product, $probability$ gives a degree of the model's certainty in the prediction,
+$Label$ is the model's prediction whether a customer buys another product, $probability$ gives a degree of the model's confidence in the prediction,
 and $explanation\ fit$ reports the locally approximated model's $R^2$ with the ten most important features utilized.
-It is apparent that the features that exhibit the highest correlation with \code{xsell} also play the biggest role for those four customers 
+It is apparent that the features exhibiting the highest correlation with \code{xsell} also play the biggest role for those four customers 
 (see figure \ref{fig_corr} in the appendix for a graphical representation of correlation in the data set). 
 
 A red bar indicates that the particular value of this feature in this case contradicts the model's conclusion,
-while a green bar shows supporting evidence to the model's prediction.
+while a green bar signals supporting evidence to the model's prediction.
 Whether the customer received an advertisement mail about opening a checking account (\code{giro\_mailing\_X1}) shows the largest weight from the regression model in every one of the four cases.
-Also the group with the lowest days passed since the customer last opened an account (\code{last\_acc\_bin1}) show a very large contribution to the 
+Also the group with the lowest days passed since the customer last opened an account (\code{last\_acc\_bin1}) shows a very large contribution to the 
 prediction in those four cases.
 Additionally, the customers' age seems to have a big impact on cross-sell predictions---its binned version is consistently included as a top reason for the predictions.
 However, note that no generalization on the entire data set is possible from this interpretation, since it only explains individual predictions.
 
-A first step towards a general statement about characteristics of the customer base is looking at the distribution of features split by whether the customer
+A first step towards a general statement about the customer base's characteristics is looking at the distribution of features split by whether the customer
 opened a checking account or not.
 For \code{age}, the violin plot in figure \ref{fig_violin_age} shows a striking difference in the age distribution.
 Younger customers tend to more often cross-buy.
@@ -438,15 +458,15 @@ Looking at the ANN's accuracy compared to a simple benchmark logit model one rec
 Do not use neural networks in this particular business setting.
 They are computationally expensive and provide no overall predictive advantage to way simpler models such as logit.
 Possible reasons for the disappointing ANN performance could be the lack of enough data---neural networks require larger data sets compared
-to well-specified simple regression-based models for accurately learning the underlying relationships \cite{chanClassifierDesignComputeraided1999}.
-Also, neural networks are better suited for other more complex tasks such as image recognition \citep{estevaDermatologistlevelClassificationSkin2017} and speech \citep{hintonDeepNeuralNetworks2012} or text recognition \citep{jaderbergSyntheticDataArtificial2014}.
+to well-specified simple regression-based models for accurately learning the underlying relationships \citep{chanClassifierDesignComputeraided1999}.
+Also, neural networks are better suited for other tasks such as image recognition \citep{estevaDermatologistlevelClassificationSkin2017} and speech \citep{hintonDeepNeuralNetworks2012} or text recognition \citep{jaderbergSyntheticDataArtificial2014}.
 In those cases, a simple multivariate regression would not be suitable.
 
 Nevertheless, LIME  provides an important way to understand why the black-box ANN predicted cross-selling.
 This is important to first get an understanding which features are contributing by how much and in which direction.
-Out-of-the box, this would not be possible with ANNs.
+Out-of-the-box, this would not be possible with ANNs.
 More importantly however, LIME builds trust in the prediction of an otherwise mysterious algorithm.
-By fitting a locally faithful and interpretable model, this new approach enables decision makers to assess the validity of the neural network's 
+By fitting a locally reasonable and interpretable model, this new approach enables decision makers to assess the validity of the neural network's 
 predictions beyond typical performance measures such as accuracy and AUC \citep{ribeiroWhyShouldTrust2016a}.
 
 Still, this paper lacks a generalizeable explanation beyond simple descriptive metrics such as correlation (see figure \ref{fig_corr}) or the distribution of observations by \code{xsell} as shown in figure \ref{fig_violin_age}.
@@ -466,18 +486,18 @@ A neural network is definitely not the method of choice for this task---even tho
 \section{Conclusion}
 
 The first goal of this paper was to predict whether a bank customer opens another checking account based on their individual characteristics.
-A sophisticated hyperparameter-tuned Artificial Neural Network was therefore introduced and its predictions compared to a simple logit model.
+A sophisticated hyper\-parameter\--tuned Artificial Neural Network was therefore introduced and its predictions compared to a simple logit model.
 Surprisingly, the ANN performed slightly worse than the benchmark logit model in terms of accuracy and only marginally outperformed it in terms of AUC.
 Due to the enormous computational resources required for finding this optimal ANN, this paper argues against the implementation of neural networks
 for predicting cross-sell in this particular business setting and for simpler methods such as a logit model.
 
-The second research question to identify underlying characteristics that drive cross-selling was initially impossible to answer with a black-box ANN.
+The second research question---identifying underlying characteristics that drive cross-selling was initially impossible to answer with a black-box ANN.
 However, this paper implemented a local approximation of the neural network with LIME by an easily interpretable regression model.
 This enabled detailed insights into which customer features support or prevent cross-selling on an individual customer level.
-Most importantly, sending mail about opening a new account is the most important feature for the four analyzed customers, followed directly by the customer's age.
+Most importantly, sending mail about opening a new account is the most contributing feature for the four analyzed customers, followed directly by the customer's age.
 Younger clients are more likely to cross-buy, which is also supported on the global level by looking at correlations and individual scatter plots.
 Even though those two methods mostly answer the research question, there is still more research to be done to establish causality.
-On a global level, the methodology implemented in this study only gives a shows which features are associated with cross-selling.
+On a global level, the methodology implemented in this study only reports which features are associated with cross-selling.
 However, no reasonable statement can be made about which features \textit{cause} an increased cross-selling probability across all customers.
 
 
