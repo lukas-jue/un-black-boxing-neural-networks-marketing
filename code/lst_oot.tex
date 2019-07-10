@@ -4,7 +4,7 @@
 #############################################
 
 # import oot data set
-xsell_oot <- read.csv("xsell_oot.csv")
+xsell_oot <- read.csv("xsell_oot.csv", na.strings=c("","NA"), stringsAsFactors = FALSE)
 
 # create new variable tenure
 xsell_oot$tenure <- xsell_oot$age - xsell_oot$entry_age
@@ -24,6 +24,9 @@ xsell_oot$giro_mailing <- as.factor(xsell_oot$giro_mailing) # remove if strange 
 xsell_oot$pop_km <- as.factor(xsell_oot$pop_km)
 xsell_oot$ppower <- as.factor(xsell_oot$ppower)
 
+# extract ID (X)
+X <- xsell_oot$X
+
 # Remove unnecessary data and clean data set
 xsell_oot_data_tbl <- xsell_oot %>%
   select(-X) %>% #removes ID
@@ -42,8 +45,8 @@ x_valid_tbl <- bake(rec_obj, new_data = xsell_oot_data_tbl)
 yhat_keras_class_vec_oot <- predict_classes(object = model_keras, x = as.matrix(x_valid_tbl)) %>%
   as.vector()
 
-xsell_oot_incl_pred <- cbind(xsell_oot, yhat_keras_class_vec_oot)
-write.csv(xsell_oot_incl_pred, "xsell_oot_predicted.csv")
+xsell_oot_incl_pred <- cbind(X, xsell_pred = yhat_keras_class_vec_oot)
+write.csv(xsell_oot_incl_pred, "xsell_oot_predicted.csv", row.names = FALSE)
 
       
 \end{lstlisting}
